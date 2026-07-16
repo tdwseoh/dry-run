@@ -1,0 +1,13 @@
+node_modules
+dist
+.vercel
+.env
+.env.local
+.env.*.local
+*.local
+.DS_Store
+npm-debug.log*
+yarn-error.log*
+
+# Vite writes these transient config timestamps during build
+vite.config.ts.timestamp-*.mjs
