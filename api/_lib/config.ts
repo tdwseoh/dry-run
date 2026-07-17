@@ -43,7 +43,7 @@ export const LLM_BASE_URL = 'https://api.groq.com/openai/v1'
 // Used when LLM_PROVIDER === 'gemini' (native API — note: no /openai suffix).
 export const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta'
 
-export const MODEL_SCENARIO = 'gemini-2.5-flash-lite' // fast + cheap; fine for inventing scenarios
+export const MODEL_SCENARIO = 'gemini-2.5-flash' // gemini-2.5-flash-lite was retired ("no longer available to new users")
 export const MODEL_JUDGE = 'gemini-2.5-flash' // stronger model for the graded verdict
 
 // Ask for a raw JSON object. Both transports support this (json_object / responseMimeType)
