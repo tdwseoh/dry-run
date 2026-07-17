@@ -1,13 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-import { SCENARIO_SYSTEM_PROMPT, SCENARIO_USER_PROMPT } from '../src/prompts/scenario'
+import { SCENARIO_SYSTEM_PROMPT, SCENARIO_USER_PROMPT } from '../src/prompts/scenario.js'
 import {
   MODEL_SCENARIO,
   SCENARIO_MAX_TOKENS,
   SCENARIO_TEMPERATURE
-} from './_lib/config'
-import { complete } from './_lib/llm'
-import { LlmOutputError, parseScenario } from './_lib/parse'
+} from './_lib/config.js'
+import { complete } from './_lib/llm.js'
+import { LlmOutputError, parseScenario } from './_lib/parse.js'
 
 // Proxies scenario generation to the LLM. Exists for one reason: to read the API
 // key (LLM_API_KEY) server-side so it never reaches the client bundle.

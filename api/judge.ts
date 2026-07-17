@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-import { buildJudgeUserMessage, JUDGE_SYSTEM_PROMPT } from '../src/prompts/judge'
+import { buildJudgeUserMessage, JUDGE_SYSTEM_PROMPT } from '../src/prompts/judge.js'
 import type { Scenario } from '../src/types'
-import { JUDGE_MAX_TOKENS, JUDGE_TEMPERATURE, MODEL_JUDGE } from './_lib/config'
-import { complete } from './_lib/llm'
-import { asScenario, isRecord, LlmOutputError, parseJudgeResult } from './_lib/parse'
+import { JUDGE_MAX_TOKENS, JUDGE_TEMPERATURE, MODEL_JUDGE } from './_lib/config.js'
+import { complete } from './_lib/llm.js'
+import { asScenario, isRecord, LlmOutputError, parseJudgeResult } from './_lib/parse.js'
 
 interface JudgeBody {
   scenario: Scenario

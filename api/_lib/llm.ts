@@ -14,7 +14,7 @@ import {
   LLM_BASE_URL,
   LLM_PROVIDER,
   USE_JSON_MODE
-} from './config'
+} from './config.js'
 
 export interface CompletionParams {
   model: string
