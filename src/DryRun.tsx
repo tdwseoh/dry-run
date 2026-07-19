@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { ErrorNote, LoadingDots } from './components/Feedback'
+import { Landing } from './components/Landing'
 import { Tally, type TallyMode } from './components/Tally'
 import { Timecode } from './components/Timecode'
 import { ApiError, generateScenario, judgeTranscript } from './lib/api'
@@ -214,47 +216,48 @@ export const DryRun = (): JSX.Element => {
 
   return (
     <div className="app">
-      <header className="rack">
+      <header className={`rack${phase === 'home' ? ' rack--nav' : ''}`}>
         <div className="rack-left">
           <span className="rack-glyph" aria-hidden="true">
             &#9654;
           </span>
           <span className="wordmark">Dry Run</span>
         </div>
-        <div className="rack-center">
-          <Timecode seconds={headerSeconds} />
-        </div>
-        <div className="rack-right">
-          <Tally mode={tallyMode} />
-        </div>
+        {phase === 'home' ? (
+          <>
+            <div className="rack-center" />
+            <div className="rack-right">
+              <button
+                className="nav-cta"
+                onClick={startRun}
+                disabled={generating}
+              >
+                Start a run
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="rack-center">
+              <Timecode seconds={headerSeconds} />
+            </div>
+            <div className="rack-right">
+              <Tally mode={tallyMode} />
+            </div>
+          </>
+        )}
       </header>
 
-      <main className="stage">
-        {phase === 'home' && (
-          <section className="screen home">
-            <p className="eyebrow">DECA roleplay &middot; solo rehearsal</p>
-            <h1 className="home-title">Dry Run</h1>
-            <p className="home-pitch">
-              Solo rehearsal for DECA roleplay. One scenario, one take, one honest
-              verdict.
-            </p>
-            <button
-              className="btn btn--primary"
-              onClick={startRun}
-              disabled={generating}
-            >
-              {generating ? 'Cueing the scenario…' : 'Start a run'}
-            </button>
-            {generating && (
-              <p className="loading-line">Rolling camera… setting the scene.</p>
-            )}
-            {error && !generating && (
-              <ErrorNote message={error} onRetry={startRun} />
-            )}
-          </section>
-        )}
-
-        {phase === 'prep' && scenario && (
+      {phase === 'home' ? (
+        <Landing
+          onStart={startRun}
+          starting={generating}
+          error={error}
+          onRetry={startRun}
+        />
+      ) : (
+        <main className="stage">
+          {phase === 'prep' && scenario && (
           <section className="screen prep">
             <div className="prep-grid">
               <div className="card scenario-card">
@@ -419,32 +422,9 @@ export const DryRun = (): JSX.Element => {
             ) : null}
           </section>
         )}
-      </main>
+        </main>
+      )}
     </div>
   )
 }
 
-// ---- Small presentational helpers ----------------------------------------
-
-interface ErrorNoteProps {
-  message: string
-  onRetry: () => void
-}
-
-const ErrorNote = ({ message, onRetry }: ErrorNoteProps): JSX.Element => (
-  <div className="error-note" role="alert">
-    <p className="error-headline">We lost the signal.</p>
-    <p className="error-message">{message}</p>
-    <button className="btn btn--ghost" onClick={onRetry}>
-      Try again
-    </button>
-  </div>
-)
-
-const LoadingDots = (): JSX.Element => (
-  <div className="dots" aria-hidden="true">
-    <span />
-    <span />
-    <span />
-  </div>
-)
