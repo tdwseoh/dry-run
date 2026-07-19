@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { personalBest, type RunRecord } from '../lib/history'
 import { ErrorNote, LoadingDots } from './Feedback'
 import { Reveal } from './Reveal'
 import { Tally } from './Tally'
@@ -16,7 +17,13 @@ interface LandingProps {
   starting: boolean
   error: string | null
   onRetry: () => void
+  /** Past takes (newest first) — renders the recent-takes strip when non-empty. */
+  history: RunRecord[]
 }
+
+/** Score → the same mint/amber/red encoding used everywhere else. */
+const chipColor = (score: number): string =>
+  score >= 75 ? 'var(--mint)' : score >= 50 ? 'var(--amber)' : 'var(--red)'
 
 interface Step {
   kicker: string
@@ -43,7 +50,7 @@ const STEPS: Step[] = [
   {
     kicker: '04 — Verdict',
     title: 'An honest score on every indicator.',
-    body: 'The judge grades each performance indicator on its own — a score, a one-line reason grounded in what you actually said, and one concrete fix. Plus an overall. No empty praise.'
+    body: 'The judge grades each performance indicator on its own — a score, a one-line reason grounded in what you actually said, and one concrete fix. Then it asks you the follow-up question a real judge would. No empty praise.'
   }
 ]
 
@@ -87,9 +94,11 @@ export const Landing = ({
   onStart,
   starting,
   error,
-  onRetry
+  onRetry,
+  history
 }: LandingProps): JSX.Element => {
   const [activeStep, setActiveStep] = useState(0)
+  const best = personalBest(history)
 
   return (
     <div className="landing">
@@ -118,6 +127,26 @@ export const Landing = ({
               {starting ? 'Cueing…' : 'Start a run'}
             </button>
           </div>
+          {history.length > 0 && best !== null && (
+            <div className="recent" aria-label="Your recent takes">
+              <span className="recent-label">Recent takes</span>
+              <div className="recent-chips">
+                {history.slice(0, 6).map((run, i) => (
+                  <span
+                    className="recent-chip"
+                    key={`${run.at}-${i}`}
+                    style={{ color: chipColor(run.overall) }}
+                    title={`${run.overall}/100 · ${run.wpm} wpm`}
+                  >
+                    {run.overall}
+                  </span>
+                ))}
+              </div>
+              <span className="recent-best">
+                Best <strong>{best}</strong>/100
+              </span>
+            </div>
+          )}
           <div className="scroll-cue" aria-hidden="true">
             <span>Scroll</span>
             <span className="chev">&#8964;</span>

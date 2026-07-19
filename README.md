@@ -30,6 +30,32 @@ off the browser.
 4. **Verdict** — the judge scores each performance indicator (score, one-line
    justification, one concrete fix) plus an overall score and summary.
 
+### The coaching layer
+
+Alongside the AI verdict, every take gets a locally computed delivery report and
+a running record — no accounts, no server:
+
+- **Live delivery HUD** — while you're on air, a live word count, words-per-minute
+  read (with a pace verdict), and filler counter update as you speak, so you can
+  correct course mid-take instead of finding out after.
+- **Delivery stats** — time on air, word count, words-per-minute with a pace
+  read (the healthy presenting band is roughly 120–160 wpm), and a filler-word
+  count ("um", "you know", "kind of", …) computed from the transcript in
+  `src/lib/delivery.ts`. Pure functions, unit-tested.
+- **The judge's follow-up** — every verdict ends with the one probing question a
+  real DECA judge would ask next, targeted at the weakest part of what you
+  actually said. Answer it out loud — that's the Q&A rep.
+- **Prep notes & the brief** — a scratchpad on the prep screen that stays visible
+  while you present, plus the situation and indicators collapsible on the on-air
+  screen, like the papers you carry into the real event. Don't like the draw?
+  **Redraw the scenario** without leaving prep.
+- **Run history** — your last 20 takes persist in `localStorage`
+  (`src/lib/history.ts`). The landing page shows your recent scores and personal
+  best, and each verdict tells you whether you beat your last take.
+- **Read the tape** — the full transcript is reviewable (and copyable) under the
+  scorecard with every detected filler highlighted in place, so you can see
+  exactly what the judge saw.
+
 ---
 
 ## Providers & models

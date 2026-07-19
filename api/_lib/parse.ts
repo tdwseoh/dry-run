@@ -122,7 +122,19 @@ export const asJudgeResult = (data: unknown): JudgeResult => {
     throw new LlmOutputError('Judge returned no indicator scores')
   }
 
-  return { scores: parsedScores, overall: clampScore(overall), summary }
+  // Optional field: a real judge's follow-up question. Tolerate its absence so a
+  // model that drops it never fails the whole verdict.
+  const followUp =
+    typeof data.followUp === 'string' && data.followUp.trim().length > 0
+      ? data.followUp.trim()
+      : undefined
+
+  const result: JudgeResult = {
+    scores: parsedScores,
+    overall: clampScore(overall),
+    summary
+  }
+  return followUp === undefined ? result : { ...result, followUp }
 }
 
 export const parseJudgeResult = (raw: string): JudgeResult =>

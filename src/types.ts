@@ -24,6 +24,9 @@ export interface JudgeResult {
   scores: IndicatorScore[]
   overall: number // 0-100
   summary: string // 2-3 sentences
+  /** The one probing question a real judge would ask next. Optional so older
+   *  model output (without the field) still validates. */
+  followUp?: string
 }
 
 // Request body sent from the browser to /api/judge.

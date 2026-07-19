@@ -93,6 +93,28 @@ describe('parseJudgeResult', () => {
     expect(result.overall).toBe(78)
   })
 
+  it('treats a missing followUp as absent, not an error', () => {
+    const result = parseJudgeResult(validJudge)
+    expect(result.followUp).toBeUndefined()
+  })
+
+  it('keeps a non-empty followUp and trims it', () => {
+    const withFollowUp = JSON.stringify({
+      ...JSON.parse(validJudge),
+      followUp: '  What would this cost per week?  '
+    })
+    expect(parseJudgeResult(withFollowUp).followUp).toBe(
+      'What would this cost per week?'
+    )
+  })
+
+  it('drops a blank or non-string followUp', () => {
+    const blank = JSON.stringify({ ...JSON.parse(validJudge), followUp: '   ' })
+    expect(parseJudgeResult(blank).followUp).toBeUndefined()
+    const wrongType = { ...JSON.parse(validJudge), followUp: 42 }
+    expect(asJudgeResult(wrongType).followUp).toBeUndefined()
+  })
+
   it('clamps out-of-range scores and rounds', () => {
     const wild = {
       scores: [

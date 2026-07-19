@@ -10,10 +10,15 @@ const format = (totalSeconds: number): string => {
 
 interface TimecodeProps {
   seconds: number
+  /** Final-minute styling: the clock turns red and pulses gently. */
+  urgent?: boolean
 }
 
-export const Timecode = ({ seconds }: TimecodeProps): JSX.Element => (
-  <span className="timecode" aria-label={`Time ${format(seconds)}`}>
+export const Timecode = ({ seconds, urgent = false }: TimecodeProps): JSX.Element => (
+  <span
+    className={`timecode${urgent ? ' timecode--urgent' : ''}`}
+    aria-label={`Time ${format(seconds)}`}
+  >
     {format(seconds)}
   </span>
 )

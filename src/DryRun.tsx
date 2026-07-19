@@ -5,6 +5,18 @@ import { Landing } from './components/Landing'
 import { Tally, type TallyMode } from './components/Tally'
 import { Timecode } from './components/Timecode'
 import { ApiError, generateScenario, judgeTranscript } from './lib/api'
+import {
+  computeDelivery,
+  paceLabel,
+  segmentFillers,
+  type DeliveryStats
+} from './lib/delivery'
+import {
+  loadHistory,
+  personalBest,
+  saveRun,
+  type RunRecord
+} from './lib/history'
 import { isSpeechSupported, startSpeech, type SpeechSession } from './lib/speech'
 import type { JudgeResult, Scenario } from './types'
 
@@ -21,17 +33,27 @@ const ONAIR_SECONDS = 600 // 10:00 presentation
 const colorFor = (score: number): string =>
   score >= 75 ? 'var(--mint)' : score >= 50 ? 'var(--amber)' : 'var(--red)'
 
+/** How this run compares to the record — computed before the run is saved. */
+interface RunContext {
+  prevLast: number | null
+  prevBest: number | null
+}
+
 /**
  * Drift-free countdown. Resets to `seconds` whenever `running` flips true, ticks
  * down while running, and calls `onDone` once when it hits zero.
  *
  * `onDone` is read through a ref so the timer always sees the latest closure
  * (state, handlers) without re-subscribing every render.
+ *
+ * Bumping `resetKey` restarts the countdown from `seconds` without leaving the
+ * phase — used when a scenario is redrawn mid-prep.
  */
 const useCountdown = (
   seconds: number,
   running: boolean,
-  onDone: () => void
+  onDone: () => void,
+  resetKey = 0
 ): number => {
   const [remaining, setRemaining] = useState(seconds)
   const onDoneRef = useRef(onDone)
@@ -51,9 +73,52 @@ const useCountdown = (
       }
     }, 250)
     return () => window.clearInterval(id)
-  }, [seconds, running])
+  }, [seconds, running, resetKey])
 
   return remaining
+}
+
+/**
+ * The big verdict number, counting up from 0 with an ease-out so the reveal has
+ * some drama. Reduced-motion users get the final number immediately.
+ */
+const ScoreCount = ({ value }: { value: number }): JSX.Element => {
+  const [shown, setShown] = useState(0)
+
+  useEffect(() => {
+    const reduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduced) {
+      setShown(value)
+      return
+    }
+    const startedAt = performance.now()
+    const DURATION_MS = 900
+    let raf = 0
+    const tick = (now: number): void => {
+      const t = Math.min(1, (now - startedAt) / DURATION_MS)
+      const eased = 1 - Math.pow(1 - t, 3) // cubic ease-out
+      setShown(Math.round(value * eased))
+      if (t < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [value])
+
+  return (
+    <span className="overall-score" style={{ color: colorFor(value) }}>
+      {shown}
+    </span>
+  )
+}
+
+/** MM:SS for the delivery strip (duplicating Timecode's format keeps it a span-free string). */
+const formatDuration = (totalSeconds: number): string => {
+  const clamped = Math.max(0, Math.floor(totalSeconds))
+  const m = Math.floor(clamped / 60)
+  const s = clamped % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
 export const DryRun = (): JSX.Element => {
@@ -63,6 +128,8 @@ export const DryRun = (): JSX.Element => {
   const [scenario, setScenario] = useState<Scenario | null>(null)
 
   const [generating, setGenerating] = useState(false)
+  const [redrawing, setRedrawing] = useState(false)
+  const [prepResetKey, setPrepResetKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   // Transcript capture.
@@ -73,13 +140,24 @@ export const DryRun = (): JSX.Element => {
   const [interim, setInterim] = useState('')
   const [typed, setTyped] = useState('')
 
+  // Prep notes — the scratchpad you write during standby and keep on air,
+  // exactly like the note paper you carry into the real event.
+  const [notes, setNotes] = useState('')
+
   // Verdict.
   const [submittedTranscript, setSubmittedTranscript] = useState('')
   const [verdict, setVerdict] = useState<JudgeResult | null>(null)
   const [judging, setJudging] = useState(false)
   const [judgeAttempt, setJudgeAttempt] = useState(0)
+  const [copied, setCopied] = useState(false)
+
+  // Delivery + history.
+  const [delivery, setDelivery] = useState<DeliveryStats | null>(null)
+  const [history, setHistory] = useState<RunRecord[]>(() => loadHistory())
+  const [runContext, setRunContext] = useState<RunContext | null>(null)
 
   const speechRef = useRef<SpeechSession | null>(null)
+  const onairStartedAtRef = useRef<number | null>(null)
 
   // Assemble the transcript we actually send to the judge.
   const buildTranscript = (): string => {
@@ -92,6 +170,7 @@ export const DryRun = (): JSX.Element => {
     setFinalTranscript('')
     setInterim('')
     setTyped('')
+    setNotes('')
     setInputMode(speechSupported ? 'speech' : 'typed')
   }
 
@@ -104,6 +183,8 @@ export const DryRun = (): JSX.Element => {
       .then((next) => {
         resetCapture()
         setVerdict(null)
+        setDelivery(null)
+        setRunContext(null)
         setScenario(next)
         setGenerating(false)
         setPhase('prep')
@@ -118,12 +199,38 @@ export const DryRun = (): JSX.Element => {
       })
   }
 
+  // Swap in a fresh scenario without leaving prep. Notes are cleared (they were
+  // written against the old brief) and the prep clock restarts from 10:00.
+  const redrawScenario = (): void => {
+    if (redrawing) return
+    setRedrawing(true)
+    generateScenario()
+      .then((next) => {
+        setScenario(next)
+        setNotes('')
+        setPrepResetKey((n) => n + 1)
+        setRedrawing(false)
+      })
+      .catch(() => {
+        // Keep the current scenario — a failed redraw should never kill the run.
+        setRedrawing(false)
+      })
+  }
+
   const goOnAir = (): void => {
+    onairStartedAtRef.current = Date.now()
     setPhase('onair')
   }
 
   const endAndScore = (): void => {
-    setSubmittedTranscript(buildTranscript())
+    const transcript = buildTranscript()
+    const startedAt = onairStartedAtRef.current
+    const elapsed =
+      startedAt === null
+        ? 0
+        : Math.min(ONAIR_SECONDS, (Date.now() - startedAt) / 1000)
+    setDelivery(computeDelivery(transcript, elapsed))
+    setSubmittedTranscript(transcript)
     setInterim('')
     setPhase('verdict')
   }
@@ -139,14 +246,45 @@ export const DryRun = (): JSX.Element => {
     setVerdict(null)
     setError(null)
     setSubmittedTranscript('')
+    setDelivery(null)
+    setRunContext(null)
     resetCapture()
     setPhase('home')
   }
 
+  const copyTranscript = (): void => {
+    try {
+      void navigator.clipboard.writeText(submittedTranscript).then(() => {
+        setCopied(true)
+        window.setTimeout(() => setCopied(false), 1500)
+      })
+    } catch {
+      // Clipboard unavailable (insecure context) — the text is on screen anyway.
+    }
+  }
+
   // ---- Timers -------------------------------------------------------------
 
-  const prepRemaining = useCountdown(PREP_SECONDS, phase === 'prep', goOnAir)
+  const prepRemaining = useCountdown(
+    PREP_SECONDS,
+    phase === 'prep',
+    goOnAir,
+    prepResetKey
+  )
   const onairRemaining = useCountdown(ONAIR_SECONDS, phase === 'onair', endAndScore)
+
+  // Live delivery read while on air, recomputed as words land. Cheap enough to
+  // run per render; wpm is hidden for the first few seconds while it's all noise.
+  const liveElapsed = ONAIR_SECONDS - onairRemaining
+  const liveStats =
+    phase === 'onair'
+      ? computeDelivery(
+          inputMode === 'typed'
+            ? typed
+            : `${finalTranscript} ${interim}`.trim(),
+          liveElapsed
+        )
+      : null
 
   // ---- Speech capture (only while on air, only in speech mode) ------------
 
@@ -185,6 +323,24 @@ export const DryRun = (): JSX.Element => {
     setError(null)
     judgeTranscript(scenario, submittedTranscript, controller.signal)
       .then((result) => {
+        // Snapshot the record BEFORE saving so we can say "beat your best" honestly.
+        const prev = loadHistory()
+        setRunContext({
+          prevLast: prev[0]?.overall ?? null,
+          prevBest: personalBest(prev)
+        })
+        const stats =
+          delivery ?? computeDelivery(submittedTranscript, ONAIR_SECONDS)
+        setHistory(
+          saveRun({
+            at: Date.now(),
+            event: scenario.event,
+            overall: result.overall,
+            words: stats.words,
+            durationSeconds: stats.durationSeconds,
+            wpm: stats.wpm
+          })
+        )
         setVerdict(result)
         setJudging(false)
       })
@@ -198,6 +354,9 @@ export const DryRun = (): JSX.Element => {
         )
       })
     return () => controller.abort()
+    // `delivery` is set together with `submittedTranscript` in endAndScore, so it
+    // is intentionally read (not depended on) here to avoid double-judging.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, scenario, submittedTranscript, judgeAttempt])
 
   // ---- Derived header state ----------------------------------------------
@@ -213,6 +372,24 @@ export const DryRun = (): JSX.Element => {
         : phase === 'home'
           ? PREP_SECONDS
           : 0
+
+  // One line comparing this take to the record, shown next to the verdict score.
+  const compareLine = ((): { text: string; tone: 'up' | 'down' | 'flat' } | null => {
+    if (!verdict || !runContext) return null
+    if (runContext.prevBest === null) {
+      return { text: 'First take on record', tone: 'flat' }
+    }
+    if (verdict.overall > runContext.prevBest) {
+      return { text: 'New personal best', tone: 'up' }
+    }
+    if (runContext.prevLast !== null) {
+      const diff = verdict.overall - runContext.prevLast
+      if (diff > 0) return { text: `Up ${diff} on your last take`, tone: 'up' }
+      if (diff < 0) return { text: `Down ${-diff} on your last take`, tone: 'down' }
+      return { text: 'Level with your last take', tone: 'flat' }
+    }
+    return null
+  })()
 
   return (
     <div className="app">
@@ -239,7 +416,12 @@ export const DryRun = (): JSX.Element => {
         ) : (
           <>
             <div className="rack-center">
-              <Timecode seconds={headerSeconds} />
+              <Timecode
+                seconds={headerSeconds}
+                urgent={
+                  (phase === 'prep' || phase === 'onair') && headerSeconds <= 60
+                }
+              />
             </div>
             <div className="rack-right">
               <Tally mode={tallyMode} />
@@ -254,6 +436,7 @@ export const DryRun = (): JSX.Element => {
           starting={generating}
           error={error}
           onRetry={startRun}
+          history={history}
         />
       ) : (
         <main className="stage">
@@ -297,10 +480,39 @@ export const DryRun = (): JSX.Element => {
                     Standby. You go on air automatically when prep runs out — or
                     jump in early whenever you&rsquo;re ready.
                   </p>
-                  <button className="btn btn--primary" onClick={goOnAir}>
+                  <button
+                    className="btn btn--primary"
+                    onClick={goOnAir}
+                    disabled={redrawing}
+                  >
                     Go on air
                   </button>
+                  <button
+                    className="btn btn--ghost btn--sm"
+                    onClick={redrawScenario}
+                    disabled={redrawing}
+                  >
+                    {redrawing ? 'Drawing…' : 'Redraw scenario'}
+                  </button>
                 </div>
+              </div>
+
+              <div className="card notes-card">
+                <p className="label">Scratchpad</p>
+                <h2 className="card-title">Your notes</h2>
+                <p className="notes-hint">
+                  Plan your open, your structure, one point per indicator. Your
+                  notes stay on screen while you present — just like the note
+                  paper in the real event.
+                </p>
+                <textarea
+                  className="notes-input"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={'1. Open: greet the judge, restate the problem\n2. …'}
+                  aria-label="Prep notes"
+                  spellCheck={false}
+                />
               </div>
             </div>
           </section>
@@ -316,6 +528,25 @@ export const DryRun = (): JSX.Element => {
               </p>
               <p className="onair-role">{scenario.role}</p>
             </div>
+
+            <details className="onair-notes">
+              <summary>The brief — situation &amp; indicators</summary>
+              <div className="onair-brief">
+                <p className="onair-brief-text">{scenario.situation}</p>
+                <ul className="onair-brief-list">
+                  {scenario.indicators.map((indicator, i) => (
+                    <li key={`${i}-${indicator}`}>{indicator}</li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+
+            {notes.trim() && (
+              <details className="onair-notes" open>
+                <summary>Your notes</summary>
+                <pre className="onair-notes-text">{notes}</pre>
+              </details>
+            )}
 
             {inputMode === 'speech' ? (
               <div
@@ -350,6 +581,32 @@ export const DryRun = (): JSX.Element => {
             )}
 
             <div className="onair-actions">
+              {liveStats && (
+                <div className="live-hud" aria-label="Live delivery read">
+                  <span className="live-stat">
+                    <strong>{liveStats.words}</strong> words
+                  </span>
+                  {liveElapsed >= 15 && liveStats.words >= 10 && (
+                    <span
+                      className={`live-stat${
+                        liveStats.wpm >= 100 && liveStats.wpm <= 165
+                          ? ' live-stat--good'
+                          : ' live-stat--warn'
+                      }`}
+                    >
+                      <strong>{liveStats.wpm}</strong> wpm ·{' '}
+                      {paceLabel(liveStats.wpm).toLowerCase()}
+                    </span>
+                  )}
+                  <span
+                    className={`live-stat${
+                      liveStats.fillerTotal === 0 ? ' live-stat--good' : ''
+                    }`}
+                  >
+                    <strong>{liveStats.fillerTotal}</strong> fillers
+                  </span>
+                </div>
+              )}
               <button className="btn btn--danger" onClick={endAndScore}>
                 End and get scored
               </button>
@@ -373,19 +630,55 @@ export const DryRun = (): JSX.Element => {
               <div className="scorecard">
                 <p className="label">The verdict</p>
                 <div className="overall">
-                  <span
-                    className="overall-score"
-                    style={{ color: colorFor(verdict.overall) }}
-                  >
-                    {verdict.overall}
-                  </span>
+                  <ScoreCount value={verdict.overall} />
                   <span className="overall-out">/ 100</span>
                 </div>
+                {compareLine && (
+                  <p className={`compare compare--${compareLine.tone}`}>
+                    {compareLine.text}
+                  </p>
+                )}
                 <p className="summary">{verdict.summary}</p>
+
+                {delivery && (
+                  <div className="delivery" aria-label="Delivery statistics">
+                    <div className="delivery-stat">
+                      <span className="delivery-num">
+                        {formatDuration(delivery.durationSeconds)}
+                      </span>
+                      <span className="delivery-cap">on air</span>
+                    </div>
+                    <div className="delivery-stat">
+                      <span className="delivery-num">{delivery.words}</span>
+                      <span className="delivery-cap">words</span>
+                    </div>
+                    <div className="delivery-stat">
+                      <span className="delivery-num">{delivery.wpm}</span>
+                      <span className="delivery-cap">
+                        wpm · {paceLabel(delivery.wpm)}
+                      </span>
+                    </div>
+                    <div className="delivery-stat">
+                      <span className="delivery-num">{delivery.fillerTotal}</span>
+                      <span className="delivery-cap">
+                        {delivery.fillerTotal === 0
+                          ? 'fillers — clean take'
+                          : `fillers · ${delivery.fillers
+                              .slice(0, 3)
+                              .map((f) => `${f.phrase} ×${f.count}`)
+                              .join(', ')}`}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 <ol className="score-list">
                   {verdict.scores.map((entry, i) => (
-                    <li className="score-row" key={`${i}-${entry.indicator}`}>
+                    <li
+                      className="score-row"
+                      key={`${i}-${entry.indicator}`}
+                      style={{ animationDelay: `${i * 90}ms` }}
+                    >
                       <div className="score-row-head">
                         <span className="score-indicator">{entry.indicator}</span>
                         <span
@@ -413,6 +706,37 @@ export const DryRun = (): JSX.Element => {
                   ))}
                 </ol>
 
+                {verdict.followUp && (
+                  <div className="followup">
+                    <p className="label">The judge looks up and asks</p>
+                    <p className="followup-q">&ldquo;{verdict.followUp}&rdquo;</p>
+                    <p className="followup-hint">
+                      Answer it out loud right now — this is exactly the Q&amp;A
+                      moment of the real event.
+                    </p>
+                  </div>
+                )}
+
+                {submittedTranscript && (
+                  <details className="tape">
+                    <summary>Read the tape — full transcript, fillers highlighted</summary>
+                    <p className="tape-text">
+                      {segmentFillers(submittedTranscript).map((seg, i) =>
+                        seg.filler ? (
+                          <mark className="filler-mark" key={i}>
+                            {seg.text}
+                          </mark>
+                        ) : (
+                          <span key={i}>{seg.text}</span>
+                        )
+                      )}
+                    </p>
+                    <button className="btn btn--ghost btn--sm" onClick={copyTranscript}>
+                      {copied ? 'Copied' : 'Copy transcript'}
+                    </button>
+                  </details>
+                )}
+
                 <div className="verdict-actions">
                   <button className="btn btn--primary" onClick={newTake}>
                     New take
@@ -427,4 +751,3 @@ export const DryRun = (): JSX.Element => {
     </div>
   )
 }
-

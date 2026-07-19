@@ -455,7 +455,83 @@ body {
 .onair-actions {
   margin-top: 20px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ---- Live delivery HUD (on air) ------------------------------------------- */
+
+.live-hud {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.live-stat {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--slate);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(14, 17, 25, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.live-stat strong {
+  color: var(--bone);
+  font-weight: 700;
+}
+
+.live-stat--good {
+  color: var(--mint);
+  border-color: rgba(55, 217, 169, 0.35);
+}
+
+.live-stat--good strong {
+  color: var(--mint);
+}
+
+.live-stat--warn {
+  color: var(--amber);
+  border-color: rgba(246, 178, 61, 0.35);
+}
+
+.live-stat--warn strong {
+  color: var(--amber);
+}
+
+/* ---- The brief while on air ----------------------------------------------- */
+
+.onair-brief {
+  margin: 12px 0 4px;
+}
+
+.onair-brief-text {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--slate);
+}
+
+.onair-brief-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--slate);
+}
+
+.onair-brief-list li::marker {
+  color: var(--amber);
 }
 
 /* ---- Verdict -------------------------------------------------------------- */
@@ -1209,5 +1285,285 @@ body {
   }
   .wave span {
     height: 55%;
+  }
+}
+
+/* ==========================================================================
+   Run analytics, notes, history — the coaching layer
+   ========================================================================== */
+
+/* ---- Timecode urgency (final minute) ------------------------------------- */
+
+.timecode--urgent {
+  color: var(--red);
+  border-color: rgba(255, 59, 48, 0.5);
+  animation: timecode-pulse 1s ease-in-out infinite;
+}
+
+@keyframes timecode-pulse {
+  0%,
+  100% {
+    background: rgba(14, 17, 25, 0.6);
+  }
+  50% {
+    background: rgba(255, 59, 48, 0.14);
+  }
+}
+
+/* ---- Prep scratchpad ------------------------------------------------------ */
+
+.notes-card {
+  grid-column: 1 / -1;
+}
+
+.notes-hint {
+  color: var(--slate);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 8px 0 14px;
+  max-width: 64ch;
+}
+
+.notes-input {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: var(--bone);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.notes-input:focus {
+  outline: none;
+  border-color: var(--amber);
+}
+
+/* ---- Notes while on air --------------------------------------------------- */
+
+.onair-notes {
+  margin: 0 0 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.onair-notes summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--amber);
+  user-select: none;
+}
+
+.onair-notes-text {
+  margin: 12px 0 4px;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--slate);
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+/* ---- Verdict: comparison line -------------------------------------------- */
+
+.compare {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 6px 0 0;
+}
+
+.compare--up {
+  color: var(--mint);
+}
+
+.compare--down {
+  color: var(--red);
+}
+
+.compare--flat {
+  color: var(--slate);
+}
+
+/* ---- Verdict: delivery strip ---------------------------------------------- */
+
+.delivery {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 22px 0 6px;
+}
+
+.delivery-stat {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.delivery-num {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.delivery-cap {
+  color: var(--slate);
+  font-size: 12.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Verdict: staggered score rows ---------------------------------------- */
+
+.score-row {
+  animation: score-in 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes score-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---- Verdict: the judge's follow-up question ------------------------------ */
+
+.followup {
+  margin-top: 22px;
+  background: var(--panel);
+  border: 1px solid rgba(246, 178, 61, 0.4);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.followup-q {
+  margin: 10px 0 0;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.followup-hint {
+  margin: 10px 0 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--slate);
+}
+
+/* ---- Verdict: the tape (transcript review) -------------------------------- */
+
+.tape {
+  margin-top: 22px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 18px;
+}
+
+.tape summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--slate);
+  user-select: none;
+}
+
+.tape summary:hover {
+  color: var(--bone);
+}
+
+.tape-text {
+  margin: 14px 0;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--bone);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* Detected fillers, highlighted in place inside the tape. */
+.filler-mark {
+  background: rgba(246, 178, 61, 0.18);
+  color: var(--amber);
+  border-radius: 4px;
+  padding: 0 3px;
+}
+
+.btn--sm {
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+/* ---- Landing: recent takes strip ------------------------------------------ */
+
+.recent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.recent-label,
+.recent-best {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.recent-best strong {
+  color: var(--bone);
+  font-weight: 700;
+}
+
+.recent-chips {
+  display: flex;
+  gap: 6px;
+}
+
+.recent-chip {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(22, 27, 38, 0.8);
+}
+
+/* ---- Responsive ----------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .delivery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

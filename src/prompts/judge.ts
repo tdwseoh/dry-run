@@ -59,6 +59,7 @@ SCORING GUIDANCE:
 - Do not cluster every indicator at the same number. Spread the scores to reflect what was actually strong vs. weak — a real presentation is uneven.
 - The "overall" is a holistic 0-100 judgment of the presentation as a whole. It should be consistent with the per-indicator scores but need not be their exact average; weight how well the student actually solved the business problem.
 - "summary" is 2-3 sentences: the single biggest strength, the single biggest weakness, and the highest-leverage thing to fix next.
+- "followUp" is the ONE probing question you, in character as the judge, would ask this student next — exactly the kind of question a real DECA judge asks after the presentation. Target the weakest or vaguest part of what they actually said (or the indicator they skipped). One sentence, addressed to the student, in character.
 
 OUTPUT FORMAT — STRICT JSON ONLY. Output a single JSON object and nothing else. No prose, no explanation, no markdown code fences. It must match exactly:
 
@@ -72,7 +73,8 @@ OUTPUT FORMAT — STRICT JSON ONLY. Output a single JSON object and nothing else
     }
   ],
   "overall": number,            // integer 0-100
-  "summary": string             // 2-3 sentences
+  "summary": string,            // 2-3 sentences
+  "followUp": string            // the one question you would ask this student next, in character
 }
 
 Return ONLY the JSON object.`
