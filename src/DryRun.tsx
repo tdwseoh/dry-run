@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ErrorNote, LoadingDots } from './components/Feedback'
 import { Landing } from './components/Landing'
+import { QnaRound } from './components/QnaRound'
 import { Tally, type TallyMode } from './components/Tally'
 import { Timecode } from './components/Timecode'
 import { ApiError, generateScenario, judgeTranscript } from './lib/api'
@@ -782,15 +783,13 @@ export const DryRun = (): JSX.Element => {
                   ))}
                 </ol>
 
-                {verdict.followUp && (
-                  <div className="followup">
-                    <p className="label">The judge looks up and asks</p>
-                    <p className="followup-q">&ldquo;{verdict.followUp}&rdquo;</p>
-                    <p className="followup-hint">
-                      Answer it out loud right now — this is exactly the Q&amp;A
-                      moment of the real event.
-                    </p>
-                  </div>
+                {verdict.followUp && scenario && (
+                  <QnaRound
+                    key={verdict.followUp}
+                    scenario={scenario}
+                    transcript={submittedTranscript}
+                    question={verdict.followUp}
+                  />
                 )}
 
                 {submittedTranscript && (

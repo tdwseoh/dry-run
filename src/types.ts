@@ -39,6 +39,21 @@ export interface JudgeRequest {
   transcript: string
 }
 
+// The judge's verdict on the student's answer to the follow-up question.
+export interface RebuttalResult {
+  score: number // 0-100
+  verdict: string // 2-3 sentences on how well the answer held up
+  tip: string // one concrete improvement for the answer
+}
+
+// Request body sent from the browser to /api/rebuttal.
+export interface RebuttalRequest {
+  scenario: Scenario
+  transcript: string // the original presentation, for context
+  question: string // the follow-up the judge asked
+  answer: string // what the student said back
+}
+
 // Uniform error envelope returned by both serverless functions on failure.
 export interface ApiErrorBody {
   error: string

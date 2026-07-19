@@ -1669,6 +1669,109 @@ body {
   color: var(--slate);
 }
 
+/* ---- Verdict: the scored Q&A round ---------------------------------------- */
+
+.qa-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.qa-input {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  margin-top: 14px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: var(--bone);
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.qa-input:focus {
+  outline: none;
+  border-color: var(--amber);
+}
+
+.qa-interim {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--slate);
+  font-style: italic;
+}
+
+.qa-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.qa-mic--live {
+  color: var(--red);
+  border-color: rgba(255, 84, 71, 0.55);
+  animation: qa-mic-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes qa-mic-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.qa-judging {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qa-result {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.qa-result-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.qa-score {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 34px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.qa-score-out {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.qa-verdict {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.65;
+}
+
 /* ---- Verdict: the tape (transcript review) -------------------------------- */
 
 .tape {

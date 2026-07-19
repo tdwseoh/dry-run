@@ -2,7 +2,13 @@
 // to the LLM directly — it calls these, which call the serverless proxy, which
 // holds the key. Both wrappers surface a clean ApiError message for the UI.
 
-import type { JudgeRequest, JudgeResult, Scenario } from '../types'
+import type {
+  JudgeRequest,
+  JudgeResult,
+  RebuttalRequest,
+  RebuttalResult,
+  Scenario
+} from '../types'
 
 /** A user-safe error whose message is already phrased for display. */
 export class ApiError extends Error {
@@ -73,4 +79,28 @@ export const judgeTranscript = async (
   })
   if (!res.ok) throw new ApiError(await readErrorMessage(res))
   return (await res.json()) as JudgeResult
+}
+
+/**
+ * Send the student's answer to the judge's follow-up question and get back a
+ * scored rebuttal verdict. The original transcript rides along as context.
+ *
+ * @throws ApiError with a display-ready message on any non-2xx response.
+ */
+export const judgeRebuttal = async (
+  scenario: Scenario,
+  transcript: string,
+  question: string,
+  answer: string,
+  signal?: AbortSignal
+): Promise<RebuttalResult> => {
+  const body: RebuttalRequest = { scenario, transcript, question, answer }
+  const res = await fetch('/api/rebuttal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal
+  })
+  if (!res.ok) throw new ApiError(await readErrorMessage(res))
+  return (await res.json()) as RebuttalResult
 }

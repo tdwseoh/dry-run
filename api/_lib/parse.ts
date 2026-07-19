@@ -4,7 +4,12 @@
 // against strings — see tests/parse.test.ts. The handlers call parseScenario /
 // parseJudgeResult and turn a thrown LlmOutputError into a 502 for the client.
 
-import type { IndicatorScore, JudgeResult, Scenario } from '../../src/types'
+import type {
+  IndicatorScore,
+  JudgeResult,
+  RebuttalResult,
+  Scenario
+} from '../../src/types'
 
 /** Raised when the model returns output we cannot trust as the expected shape. */
 export class LlmOutputError extends Error {
@@ -139,3 +144,22 @@ export const asJudgeResult = (data: unknown): JudgeResult => {
 
 export const parseJudgeResult = (raw: string): JudgeResult =>
   asJudgeResult(parseJson(raw))
+
+/** Validate an already-parsed value as a RebuttalResult, clamping the score. */
+export const asRebuttalResult = (data: unknown): RebuttalResult => {
+  if (!isRecord(data)) {
+    throw new LlmOutputError('Rebuttal result is not a JSON object')
+  }
+  const { score, verdict, tip } = data
+  if (
+    typeof score !== 'number' ||
+    typeof verdict !== 'string' ||
+    typeof tip !== 'string'
+  ) {
+    throw new LlmOutputError('Rebuttal JSON is missing required fields')
+  }
+  return { score: clampScore(score), verdict, tip }
+}
+
+export const parseRebuttalResult = (raw: string): RebuttalResult =>
+  asRebuttalResult(parseJson(raw))

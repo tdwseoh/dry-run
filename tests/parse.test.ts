@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   asJudgeResult,
+  asRebuttalResult,
   extractJsonObject,
   LlmOutputError,
   parseJudgeResult,
+  parseRebuttalResult,
   parseScenario
 } from '../api/_lib/parse'
 
@@ -138,5 +140,35 @@ describe('parseJudgeResult', () => {
     expect(() =>
       parseJudgeResult('{"scores":[{"indicator":"x"}],"overall":50,"summary":"y"}')
     ).toThrow(LlmOutputError)
+  })
+})
+
+describe('parseRebuttalResult', () => {
+  const validRebuttal = JSON.stringify({
+    score: 62,
+    verdict: 'You engaged the question but never named a number.',
+    tip: 'Commit to a specific budget figure and defend it.'
+  })
+
+  it('accepts a valid rebuttal result (even fenced)', () => {
+    const result = parseRebuttalResult('```json\n' + validRebuttal + '\n```')
+    expect(result.score).toBe(62)
+    expect(result.tip).toContain('budget')
+  })
+
+  it('clamps out-of-range scores and rounds', () => {
+    expect(asRebuttalResult({ score: 130.4, verdict: 'v', tip: 't' }).score).toBe(100)
+    expect(asRebuttalResult({ score: -5, verdict: 'v', tip: 't' }).score).toBe(0)
+  })
+
+  it('rejects missing fields', () => {
+    expect(() => parseRebuttalResult('{"score": 50}')).toThrow(LlmOutputError)
+    expect(() =>
+      parseRebuttalResult('{"score":"high","verdict":"v","tip":"t"}')
+    ).toThrow(LlmOutputError)
+  })
+
+  it('rejects non-object output', () => {
+    expect(() => parseRebuttalResult('[1, 2, 3]')).toThrow(LlmOutputError)
   })
 })

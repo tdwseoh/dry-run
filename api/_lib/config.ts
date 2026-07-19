@@ -53,6 +53,8 @@ export const USE_JSON_MODE = true
 
 export const SCENARIO_MAX_TOKENS = 1024
 export const JUDGE_MAX_TOKENS = 2048
+// The rebuttal verdict is one score + two short strings — a small budget keeps it fast.
+export const REBUTTAL_MAX_TOKENS = 512
 
 // Higher temperature => more varied scenarios. Lower => more consistent grading.
 export const SCENARIO_TEMPERATURE = 1

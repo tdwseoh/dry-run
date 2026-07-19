@@ -13,6 +13,7 @@ vi.mock('../api/_lib/llm', () => ({ complete: completeMock }))
 // Import the handlers AFTER the mock is registered.
 import scenarioHandler from '../api/generate-scenario'
 import judgeHandler from '../api/judge'
+import rebuttalHandler from '../api/rebuttal'
 
 // Minimal typed stand-ins for the Vercel req/res objects the handlers use.
 const makeRes = (): {
@@ -148,5 +149,52 @@ describe('judge handler', () => {
       res
     )
     expect(state.statusCode).toBe(502)
+  })
+})
+
+describe('rebuttal handler', () => {
+  const VALID_BODY = {
+    scenario: VALID_SCENARIO,
+    transcript: 'I would cover the bar myself.',
+    question: 'What does that do to your labor budget?',
+    answer: 'It adds about six hours of my salaried time, so no extra hourly cost.'
+  }
+
+  it('returns 200 with a parsed rebuttal verdict', async () => {
+    completeMock.mockResolvedValue(
+      JSON.stringify({ score: 74, verdict: 'Held up.', tip: 'Name the dollar figure.' })
+    )
+    const { state, res } = makeRes()
+    await rebuttalHandler(asReq({ body: VALID_BODY }), res)
+    expect(state.statusCode).toBe(200)
+    expect((state.body as { score: number }).score).toBe(74)
+    // The rebuttal prompt must carry both the question and the answer.
+    const call = completeMock.mock.calls[0]?.[0] as { user: string }
+    expect(call.user).toContain(VALID_BODY.question)
+    expect(call.user).toContain(VALID_BODY.answer)
+  })
+
+  it('returns 400 when the answer is missing (and never calls the model)', async () => {
+    const { state, res } = makeRes()
+    await rebuttalHandler(
+      asReq({ body: { scenario: VALID_SCENARIO, transcript: 't', question: 'q' } }),
+      res
+    )
+    expect(state.statusCode).toBe(400)
+    expect(completeMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 502 when the rebuttal output is unparseable', async () => {
+    completeMock.mockResolvedValue('the judge shrugs')
+    const { state, res } = makeRes()
+    await rebuttalHandler(asReq({ body: VALID_BODY }), res)
+    expect(state.statusCode).toBe(502)
+  })
+
+  it('rejects non-POST with 405', async () => {
+    const { state, res } = makeRes()
+    await rebuttalHandler(asReq({ method: 'GET' }), res)
+    expect(state.statusCode).toBe(405)
+    expect(completeMock).not.toHaveBeenCalled()
   })
 })
