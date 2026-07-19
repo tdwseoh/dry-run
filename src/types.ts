@@ -4,6 +4,10 @@
 // validators (api/_lib/parse.ts) and the React UI. If you change a shape here,
 // update the matching validator so malformed model output is still caught.
 
+// Which DECA format the run follows. Individual events give 10:00 prep and
+// 10:00 on air; team decision-making events give 30:00 prep and 15:00 on air.
+export type RunMode = 'solo' | 'team'
+
 export interface Scenario {
   event: string
   cluster: string

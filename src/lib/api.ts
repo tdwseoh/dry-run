@@ -29,15 +29,27 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
 /**
- * Ask the proxy for a fresh scenario.
+ * Ask the proxy for a scenario. With no arguments the server invents one; pass
+ * `sourceText` (the extracted text of an official event PDF) to have the server
+ * faithfully structure THAT roleplay instead.
  *
  * @param signal optional AbortSignal to cancel an in-flight request.
  * @throws ApiError with a display-ready message on any non-2xx response.
  */
 export const generateScenario = async (
+  sourceText?: string,
   signal?: AbortSignal
 ): Promise<Scenario> => {
-  const res = await fetch('/api/generate-scenario', { method: 'POST', signal })
+  const res = await fetch('/api/generate-scenario', {
+    method: 'POST',
+    signal,
+    ...(sourceText
+      ? {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sourceText })
+        }
+      : {})
+  })
   if (!res.ok) throw new ApiError(await readErrorMessage(res))
   return (await res.json()) as Scenario
 }

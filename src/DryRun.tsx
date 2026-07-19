@@ -5,6 +5,7 @@ import { Landing } from './components/Landing'
 import { Tally, type TallyMode } from './components/Tally'
 import { Timecode } from './components/Timecode'
 import { ApiError, generateScenario, judgeTranscript } from './lib/api'
+import { playAlarm, primeAlarm } from './lib/alarm'
 import {
   computeDelivery,
   paceLabel,
@@ -18,7 +19,7 @@ import {
   type RunRecord
 } from './lib/history'
 import { isSpeechSupported, startSpeech, type SpeechSession } from './lib/speech'
-import type { JudgeResult, Scenario } from './types'
+import type { JudgeResult, RunMode, Scenario } from './types'
 
 // The whole app is one state machine keyed on `phase`. Everything else is derived.
 type Phase = 'home' | 'prep' | 'onair' | 'verdict'
@@ -26,8 +27,12 @@ type Phase = 'home' | 'prep' | 'onair' | 'verdict'
 // How the presentation is being captured: live speech, or the typed fallback.
 type InputMode = 'speech' | 'typed'
 
-const PREP_SECONDS = 600 // 10:00 prep
-const ONAIR_SECONDS = 600 // 10:00 presentation
+// Real DECA timing: individual events run 10:00 prep + 10:00 presentation;
+// team decision-making events run 30:00 prep + 15:00 presentation.
+const TIMINGS: Record<RunMode, { prep: number; onair: number }> = {
+  solo: { prep: 600, onair: 600 },
+  team: { prep: 1800, onair: 900 }
+}
 
 /** Map a 0-100 score to its encoding colour: mint (strong) / amber (mid) / red (weak). */
 const colorFor = (score: number): string =>
@@ -121,11 +126,56 @@ const formatDuration = (totalSeconds: number): string => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+/**
+ * The standby ring — the visual centerpiece of the prep wait. An SVG ring that
+ * depletes with the countdown (the sweep animates via a CSS transition on the
+ * dash offset), amber while there's time, red and pulsing in the final minute.
+ */
+const StandbyRing = ({
+  remaining,
+  total
+}: {
+  remaining: number
+  total: number
+}): JSX.Element => {
+  const R = 84
+  const C = 2 * Math.PI * R
+  const frac = total > 0 ? remaining / total : 0
+  const urgent = remaining <= 60
+  return (
+    <div
+      className={`ring${urgent ? ' ring--urgent' : ''}`}
+      role="timer"
+      aria-label={`Prep time remaining ${formatDuration(remaining)}`}
+    >
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <circle className="ring-track" cx="100" cy="100" r={R} />
+        <circle
+          className="ring-fill"
+          cx="100"
+          cy="100"
+          r={R}
+          strokeDasharray={C}
+          strokeDashoffset={C * (1 - frac)}
+          transform="rotate(-90 100 100)"
+        />
+      </svg>
+      <div className="ring-center">
+        <span className="ring-time">{formatDuration(remaining)}</span>
+        <span className="ring-cap">{urgent ? 'going on air' : 'standby'}</span>
+      </div>
+    </div>
+  )
+}
+
 export const DryRun = (): JSX.Element => {
   const speechSupported = useMemo(() => isSpeechSupported(), [])
 
   const [phase, setPhase] = useState<Phase>('home')
+  const [mode, setMode] = useState<RunMode>('solo')
   const [scenario, setScenario] = useState<Scenario | null>(null)
+  // True when the scenario came from an uploaded official PDF (fixed — no redraw).
+  const [fromPdf, setFromPdf] = useState(false)
 
   const [generating, setGenerating] = useState(false)
   const [redrawing, setRedrawing] = useState(false)
@@ -176,15 +226,18 @@ export const DryRun = (): JSX.Element => {
 
   // ---- Transitions --------------------------------------------------------
 
-  const startRun = (): void => {
+  const startRun = (runMode: RunMode, sourceText?: string): void => {
+    primeAlarm() // must happen inside the click gesture so the alarm can sound later
     setError(null)
     setGenerating(true)
-    generateScenario()
+    generateScenario(sourceText)
       .then((next) => {
         resetCapture()
         setVerdict(null)
         setDelivery(null)
         setRunContext(null)
+        setMode(runMode)
+        setFromPdf(sourceText !== undefined)
         setScenario(next)
         setGenerating(false)
         setPhase('prep')
@@ -228,7 +281,7 @@ export const DryRun = (): JSX.Element => {
     const elapsed =
       startedAt === null
         ? 0
-        : Math.min(ONAIR_SECONDS, (Date.now() - startedAt) / 1000)
+        : Math.min(TIMINGS[mode].onair, (Date.now() - startedAt) / 1000)
     setDelivery(computeDelivery(transcript, elapsed))
     setSubmittedTranscript(transcript)
     setInterim('')
@@ -265,17 +318,27 @@ export const DryRun = (): JSX.Element => {
 
   // ---- Timers -------------------------------------------------------------
 
+  const timings = TIMINGS[mode]
+
+  // When a countdown expires on its own the alarm rings; skipping ahead manually
+  // (the buttons call goOnAir/endAndScore directly) stays silent.
   const prepRemaining = useCountdown(
-    PREP_SECONDS,
+    timings.prep,
     phase === 'prep',
-    goOnAir,
+    () => {
+      playAlarm('standby-over')
+      goOnAir()
+    },
     prepResetKey
   )
-  const onairRemaining = useCountdown(ONAIR_SECONDS, phase === 'onair', endAndScore)
+  const onairRemaining = useCountdown(timings.onair, phase === 'onair', () => {
+    playAlarm('time-up')
+    endAndScore()
+  })
 
   // Live delivery read while on air, recomputed as words land. Cheap enough to
   // run per render; wpm is hidden for the first few seconds while it's all noise.
-  const liveElapsed = ONAIR_SECONDS - onairRemaining
+  const liveElapsed = timings.onair - onairRemaining
   const liveStats =
     phase === 'onair'
       ? computeDelivery(
@@ -330,7 +393,7 @@ export const DryRun = (): JSX.Element => {
           prevBest: personalBest(prev)
         })
         const stats =
-          delivery ?? computeDelivery(submittedTranscript, ONAIR_SECONDS)
+          delivery ?? computeDelivery(submittedTranscript, TIMINGS[mode].onair)
         setHistory(
           saveRun({
             at: Date.now(),
@@ -370,7 +433,7 @@ export const DryRun = (): JSX.Element => {
       : phase === 'onair'
         ? onairRemaining
         : phase === 'home'
-          ? PREP_SECONDS
+          ? timings.prep
           : 0
 
   // One line comparing this take to the record, shown next to the verdict score.
@@ -406,7 +469,7 @@ export const DryRun = (): JSX.Element => {
             <div className="rack-right">
               <button
                 className="nav-cta"
-                onClick={startRun}
+                onClick={() => startRun(mode)}
                 disabled={generating}
               >
                 Start a run
@@ -435,7 +498,8 @@ export const DryRun = (): JSX.Element => {
           onStart={startRun}
           starting={generating}
           error={error}
-          onRetry={startRun}
+          mode={mode}
+          onModeChange={setMode}
           history={history}
         />
       ) : (
@@ -446,7 +510,10 @@ export const DryRun = (): JSX.Element => {
               <div className="card scenario-card">
                 <p className="label">The scenario</p>
                 <h2 className="card-title">{scenario.event}</h2>
-                <p className="cluster-tag">{scenario.cluster}</p>
+                <p className="cluster-tag">
+                  {scenario.cluster}
+                  {fromPdf && <span className="official-tag">Official PDF</span>}
+                </p>
 
                 <div className="scenario-block">
                   <p className="label">Your role</p>
@@ -475,25 +542,34 @@ export const DryRun = (): JSX.Element => {
                     </li>
                   ))}
                 </ol>
+              </div>
+
+              <div className="card standby-card">
+                <StandbyRing remaining={prepRemaining} total={timings.prep} />
                 <div className="prep-actions">
                   <p className="standby-note">
-                    Standby. You go on air automatically when prep runs out — or
-                    jump in early whenever you&rsquo;re ready.
+                    {mode === 'team'
+                      ? 'Team format: 30:00 to prep, 15:00 on air.'
+                      : 'Individual format: 10:00 to prep, 10:00 on air.'}{' '}
+                    An alarm sounds and you go on air automatically when prep
+                    runs out.
                   </p>
                   <button
                     className="btn btn--primary"
                     onClick={goOnAir}
                     disabled={redrawing}
                   >
-                    Go on air
+                    Skip the wait — go on air
                   </button>
-                  <button
-                    className="btn btn--ghost btn--sm"
-                    onClick={redrawScenario}
-                    disabled={redrawing}
-                  >
-                    {redrawing ? 'Drawing…' : 'Redraw scenario'}
-                  </button>
+                  {!fromPdf && (
+                    <button
+                      className="btn btn--ghost btn--sm"
+                      onClick={redrawScenario}
+                      disabled={redrawing}
+                    >
+                      {redrawing ? 'Drawing…' : 'Redraw scenario'}
+                    </button>
+                  )}
                 </div>
               </div>
 

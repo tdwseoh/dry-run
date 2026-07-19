@@ -21,12 +21,20 @@ off the browser.
 
 `home → prep → onair → verdict → (new take)`
 
-1. **Home** — start a run. The app generates a scenario.
-2. **Prep** — read your role, the situation, and the performance indicators you'll
-   be judged on. A 10:00 STANDBY countdown runs; go on air early whenever you're
-   ready.
-3. **On air** — a 10:00 countdown and a pulsing ON AIR tally. Present out loud;
-   your words stream into the transcript. End early whenever you're done.
+1. **Home** — pick a format and start a run:
+   - **Individual** — 10:00 prep, 10:00 on air (DECA individual-series timing).
+   - **Team** — 30:00 prep, 15:00 on air (DECA team-decision-making timing).
+   The app generates a scenario — **or upload the official event PDF** and
+   rehearse the real roleplay, graded on its printed performance indicators.
+   The PDF is read entirely in your browser (pdf.js, lazy-loaded); only its
+   text is sent to the server for structuring.
+2. **Prep** — read your role, the situation, and the performance indicators
+   you'll be judged on. A STANDBY countdown ring depletes as you prep; skip the
+   wait whenever you're ready. When prep expires an **alarm sounds** and you go
+   on air automatically.
+3. **On air** — the countdown and a pulsing ON AIR tally. Present out loud;
+   your words stream into the transcript. End early whenever you're done (the
+   alarm rings if the clock runs out first).
 4. **Verdict** — the judge scores each performance indicator (score, one-line
    justification, one concrete fix) plus an overall score and summary.
 

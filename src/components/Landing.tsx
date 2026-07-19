@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { primeAlarm } from '../lib/alarm'
 import { personalBest, type RunRecord } from '../lib/history'
+import type { RunMode } from '../types'
 import { ErrorNote, LoadingDots } from './Feedback'
 import { Reveal } from './Reveal'
 import { Tally } from './Tally'
@@ -11,12 +13,18 @@ import { Timecode } from './Timecode'
 // on air → verdict) as the captions scroll past it. `onStart` kicks off the real
 // run; while it's generating (or if it errors) a full-screen launch overlay covers
 // the page so the transition into the app feels intentional.
+//
+// Two ways in: generate a fresh scenario, or upload the OFFICIAL event PDF —
+// the PDF is read entirely in the browser (pdf.js, lazy-loaded) and only its
+// text goes to the server for structuring.
 
 interface LandingProps {
-  onStart: () => void
+  onStart: (mode: RunMode, sourceText?: string) => void
   starting: boolean
   error: string | null
-  onRetry: () => void
+  /** Selected run format; lives in the parent so the header CTA matches. */
+  mode: RunMode
+  onModeChange: (mode: RunMode) => void
   /** Past takes (newest first) — renders the recent-takes strip when non-empty. */
   history: RunRecord[]
 }
@@ -94,11 +102,62 @@ export const Landing = ({
   onStart,
   starting,
   error,
-  onRetry,
+  mode,
+  onModeChange,
   history
 }: LandingProps): JSX.Element => {
   const [activeStep, setActiveStep] = useState(0)
   const best = personalBest(history)
+
+  // PDF-upload flow: extraction happens here in the browser; only the text is
+  // handed up. `reading` covers the extraction wait, `pdfError` local failures.
+  const [reading, setReading] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  // Kept so "Try again" after a server-side failure can resend the same text.
+  const lastPdfTextRef = useRef<string | undefined>(undefined)
+
+  const startGenerated = (): void => {
+    lastPdfTextRef.current = undefined
+    onStart(mode)
+  }
+
+  const handleFile = (file: File | null): void => {
+    if (!file) return
+    primeAlarm() // picking a file is the user gesture that unlocks audio
+    setPdfError(null)
+    setReading(true)
+    import('../lib/pdf')
+      .then(async ({ extractPdfText, PdfReadError }) => {
+        try {
+          const text = await extractPdfText(file)
+          lastPdfTextRef.current = text
+          onStart(mode, text)
+        } catch (err) {
+          setPdfError(
+            err instanceof PdfReadError
+              ? err.message
+              : "Couldn't read that PDF. Try a different file."
+          )
+        } finally {
+          setReading(false)
+        }
+      })
+      .catch(() => {
+        setReading(false)
+        setPdfError('The PDF reader failed to load. Check your connection and try again.')
+      })
+    // Allow re-picking the same file after an error.
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const retry = (): void => {
+    if (pdfError) {
+      setPdfError(null)
+      return
+    }
+    onStart(mode, lastPdfTextRef.current)
+  }
 
   return (
     <div className="landing">
@@ -118,15 +177,58 @@ export const Landing = ({
             minutes on the clock, then an honest, indicator-by-indicator verdict — no
             partner required.
           </p>
+          <div
+            className="mode-toggle"
+            role="radiogroup"
+            aria-label="Run format"
+          >
+            <button
+              className={`mode-opt${mode === 'solo' ? ' is-active' : ''}`}
+              role="radio"
+              aria-checked={mode === 'solo'}
+              onClick={() => onModeChange('solo')}
+            >
+              <span className="mode-name">Individual</span>
+              <span className="mode-timing">10:00 prep · 10:00 on air</span>
+            </button>
+            <button
+              className={`mode-opt${mode === 'team' ? ' is-active' : ''}`}
+              role="radio"
+              aria-checked={mode === 'team'}
+              onClick={() => onModeChange('team')}
+            >
+              <span className="mode-name">Team</span>
+              <span className="mode-timing">30:00 prep · 15:00 on air</span>
+            </button>
+          </div>
           <div className="hero-actions">
             <button
               className="btn btn--primary btn--lg"
-              onClick={onStart}
-              disabled={starting}
+              onClick={startGenerated}
+              disabled={starting || reading}
             >
               {starting ? 'Cueing…' : 'Start a run'}
             </button>
+            <button
+              className="btn btn--ghost btn--lg"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={starting || reading}
+            >
+              Upload the event PDF
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              className="visually-hidden"
+              aria-label="Upload an official DECA roleplay PDF"
+              onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+            />
           </div>
+          <p className="upload-hint">
+            Have the official roleplay? Upload the event PDF and rehearse the
+            real scenario — graded on its printed performance indicators.
+          </p>
           {history.length > 0 && best !== null && (
             <div className="recent" aria-label="Your recent takes">
               <span className="recent-label">Recent takes</span>
@@ -275,24 +377,30 @@ export const Landing = ({
           <p className="final-sub">Pick nothing. Start a run. See where you stand.</p>
           <button
             className="btn btn--primary btn--lg"
-            onClick={onStart}
-            disabled={starting}
+            onClick={startGenerated}
+            disabled={starting || reading}
           >
             {starting ? 'Cueing…' : 'Start a run'}
           </button>
         </Reveal>
       </section>
 
-      {/* Launch overlay: covers the page during generation, or on failure. */}
-      {(starting || error) && (
+      {/* Launch overlay: covers the page during PDF reading / generation, or on failure. */}
+      {(starting || reading || error || pdfError) && (
         <div className="launch-overlay" role="status" aria-live="polite">
-          {error ? (
-            <ErrorNote message={error} onRetry={onRetry} />
+          {pdfError || error ? (
+            <ErrorNote message={pdfError ?? error ?? ''} onRetry={retry} />
           ) : (
             <div className="launch-inner">
               <Tally mode="onair" />
-              <p className="launch-text">Rolling camera…</p>
-              <p className="launch-sub">Setting the scene.</p>
+              <p className="launch-text">
+                {reading ? 'Reading the brief…' : 'Rolling camera…'}
+              </p>
+              <p className="launch-sub">
+                {reading
+                  ? 'Extracting the official scenario from your PDF.'
+                  : 'Setting the scene.'}
+              </p>
               <LoadingDots />
             </div>
           )}

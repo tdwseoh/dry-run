@@ -92,6 +92,34 @@ describe('generate-scenario handler', () => {
     expect(state.statusCode).toBe(405)
     expect(completeMock).not.toHaveBeenCalled()
   })
+
+  it('extracts (not invents) when the body carries sourceText from a PDF', async () => {
+    completeMock.mockResolvedValue(JSON.stringify(VALID_SCENARIO))
+    const { state, res } = makeRes()
+    await scenarioHandler(
+      asReq({ body: { sourceText: 'PARTICIPANT INSTRUCTIONS ... ROLE ... PERFORMANCE INDICATORS ...' } }),
+      res
+    )
+    expect(state.statusCode).toBe(200)
+    // The extraction prompt (not the invention prompt) must have been used.
+    const call = completeMock.mock.calls[0]?.[0] as { system: string; user: string }
+    expect(call.system).toMatch(/official DECA roleplay event document/i)
+    expect(call.user).toContain('PARTICIPANT INSTRUCTIONS')
+  })
+
+  it('returns 400 when the extraction says the document is not a roleplay', async () => {
+    completeMock.mockResolvedValue('{"error": "not-a-roleplay"}')
+    const { state, res } = makeRes()
+    await scenarioHandler(asReq({ body: { sourceText: 'my chemistry homework' } }), res)
+    expect(state.statusCode).toBe(400)
+  })
+
+  it('returns 400 for an oversized sourceText without calling the model', async () => {
+    const { state, res } = makeRes()
+    await scenarioHandler(asReq({ body: { sourceText: 'x'.repeat(25_000) } }), res)
+    expect(state.statusCode).toBe(400)
+    expect(completeMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('judge handler', () => {

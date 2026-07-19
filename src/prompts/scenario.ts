@@ -38,3 +38,35 @@ Return ONLY the JSON object.`
 
 export const SCENARIO_USER_PROMPT =
   'Write a fresh Principles of Business Management and Administration roleplay now. Make it distinct from a generic textbook example. Return only the JSON object.'
+
+// ---------------------------------------------------------------------------
+// Extraction prompt — used when the student uploads an OFFICIAL event PDF.
+// The PDF's text arrives as sourceText; the job is to faithfully re-structure
+// it into the Scenario shape, NOT to invent anything. In particular the
+// performance indicators must be copied from the document verbatim — this is
+// how the trainer grades against real DECA PIs instead of approximations.
+// ---------------------------------------------------------------------------
+
+export const SCENARIO_EXTRACT_SYSTEM_PROMPT = `You convert the raw extracted text of an official DECA roleplay event document into structured JSON for a rehearsal app. The text may contain page furniture (headers, footers, instructions to the judge, rubric tables) — ignore that noise and find the actual roleplay.
+
+Produce ONE JSON object and nothing else — no prose, no markdown fences — matching exactly:
+
+{
+  "event": string,        // the event name as printed in the document
+  "cluster": string,      // the career cluster as printed (or the closest stated grouping)
+  "role": string,         // the participant's role, rewritten in second person ("You are ...")
+  "situation": string,    // the situation/task exactly as the document describes it, condensed to 2-5 sentences, keeping every concrete number, name, and constraint
+  "judgeRole": string,    // who the judge plays, as stated in the document
+  "indicators": string[]  // the performance indicators listed in the document, copied VERBATIM, in order
+}
+
+Rules:
+- Do NOT invent, add, or reword performance indicators. Copy the ones printed in the document exactly. If the document numbers them, drop the numbers but keep the wording.
+- Preserve the document's specifics (figures, deadlines, product names) in "situation" — they are what the student must address.
+- If the text is clearly not a DECA roleplay (no role, no situation, no performance indicators), return exactly: {"error": "not-a-roleplay"}
+
+Return ONLY the JSON object.`
+
+/** Wraps the uploaded document text for the extraction call. */
+export const buildScenarioExtractUserMessage = (sourceText: string): string =>
+  `Here is the extracted text of the official event PDF:\n"""\n${sourceText}\n"""\n\nStructure it as instructed. Return only the JSON object.`
