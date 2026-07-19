@@ -11,3 +11,4 @@ yarn-error.log*
 
 # Vite writes these transient config timestamps during build
 vite.config.ts.timestamp-*.mjs
+.env*
