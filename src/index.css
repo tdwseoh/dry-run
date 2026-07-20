@@ -2925,3 +2925,268 @@ body {
   color: var(--slate);
   white-space: nowrap;
 }
+
+/* ==========================================================================
+   Landing: community showcase (Stage C)
+   ========================================================================== */
+
+.seq-journey {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--amber);
+  margin: 0 0 10px;
+  opacity: 0.85;
+}
+
+/* ---- Platform showcase ----------------------------------------------------- */
+
+.showcase {
+  position: relative;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 10vh 22px;
+}
+
+.showcase::before {
+  content: '';
+  position: absolute;
+  inset: 15% 0 auto;
+  height: 55%;
+  pointer-events: none;
+  background: radial-gradient(50% 60% at 70% 40%, rgba(55, 217, 169, 0.07), transparent);
+}
+
+.showcase-inner {
+  display: grid;
+  grid-template-columns: 1fr minmax(320px, 470px);
+  gap: 44px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .showcase-inner {
+    grid-template-columns: 1fr;
+  }
+}
+
+.showcase-title {
+  font-size: clamp(34px, 5.4vw, 62px);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  margin: 14px 0 16px;
+}
+
+.showcase-sub {
+  color: var(--slate);
+  font-size: 16.5px;
+  line-height: 1.6;
+  max-width: 44ch;
+  margin: 0;
+}
+
+.showcase-card {
+  min-width: 0;
+}
+
+/* ---- Community counters ---------------------------------------------------- */
+
+.community {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 8vh 22px 6vh;
+  text-align: center;
+}
+
+.community-title {
+  font-size: clamp(30px, 4.6vw, 52px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 12px 0 40px;
+}
+
+.counters {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 800px) {
+  .counters {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.counter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 26px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(22, 27, 38, 0.5);
+}
+
+.counter-num {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: clamp(30px, 4vw, 44px);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(120deg, var(--amber), var(--mint));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.counter-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+.community-note {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--slate);
+  opacity: 0.7;
+  margin: 18px 0 0;
+}
+
+/* ---- Student stories ------------------------------------------------------- */
+
+.stories {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 4vh 22px 8vh;
+}
+
+.stories-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 860px) {
+  .stories-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.story {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 28px;
+  border-left: 2px solid var(--amber);
+  background: linear-gradient(90deg, rgba(246, 178, 61, 0.05), transparent 55%);
+}
+
+.story-quote {
+  font-size: 17px;
+  line-height: 1.65;
+  font-style: italic;
+  margin: 0;
+}
+
+.story-who {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--slate);
+  margin: 0;
+}
+
+/* ---- School leaderboard ----------------------------------------------------- */
+
+.board {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 6vh 22px 10vh;
+  text-align: center;
+}
+
+.board-title {
+  font-size: clamp(30px, 4.6vw, 52px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 12px 0 10px;
+}
+
+.board-sub {
+  color: var(--slate);
+  font-size: 15px;
+  line-height: 1.55;
+  max-width: 52ch;
+  margin: 0 auto 30px;
+}
+
+.board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.board-list li {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 15px 22px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  transition: border-color 0.25s ease, transform 0.25s ease;
+}
+
+.board-list li:hover {
+  border-color: rgba(241, 238, 231, 0.25);
+  transform: translateX(4px);
+}
+
+.board-list li.is-leader {
+  border-color: rgba(246, 178, 61, 0.5);
+  background: linear-gradient(90deg, rgba(246, 178, 61, 0.08), var(--panel) 60%);
+}
+
+.board-rank {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--slate);
+  min-width: 22px;
+}
+
+.is-leader .board-rank {
+  color: var(--amber);
+}
+
+.board-school {
+  font-weight: 700;
+  font-size: 16px;
+  flex: 1;
+}
+
+.board-takes {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--slate);
+  font-variant-numeric: tabular-nums;
+}
+
+.final-actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}

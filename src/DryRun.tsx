@@ -609,6 +609,7 @@ export const DryRun = (): JSX.Element => {
           history={history}
           profile={profile}
           streakDays={currentStreak(log, new Date())}
+          onCreateProfile={() => setShowOnboarding(true)}
         />
       ) : (
         <main className="stage">
