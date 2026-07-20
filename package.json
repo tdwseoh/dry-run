@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:llm": "node --env-file=.env scripts/check-llm.mjs",
+    "check:llm": "node --env-file=.env --import tsx scripts/check-llm.mjs",
     "test:judge": "node --env-file=.env --import tsx scripts/test-judge.ts",
     "frames": "node scripts/generate-frames.mjs",
     "og": "node scripts/generate-og.mjs"

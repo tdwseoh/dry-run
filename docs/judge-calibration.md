@@ -1,9 +1,14 @@
 # Judge calibration — live output
 
-Every result below came from the real pipeline (`gemini-2.5-flash` through
-`/api/generate-scenario` → `/api/judge` → `/api/rebuttal`) on 2026-07-20 — not
-from fixtures. It is the evidence that the judge discriminates instead of
-handing out participation scores.
+Every result below came from the real pipeline (`/api/generate-scenario` →
+`/api/judge` → `/api/rebuttal`) on 2026-07-20 — not from fixtures. It is the
+evidence that the judge discriminates instead of handing out participation
+scores.
+
+The scores below were captured on **`gemini-2.5-flash`**. The app has since
+switched to **Groq** (`llama-3.3-70b-versatile` judge) for its far larger free
+tier; the spread holds and is if anything *stricter* — see "Provider swap"
+at the bottom.
 
 ## The scenario (generated, HTDM @ ICDC tier)
 
@@ -101,3 +106,23 @@ reason the harness exists.
 
 Reproduce everything here with `npm run test:judge`, or by running the app and
 presenting a deliberately vague take.
+
+## Provider swap — same discrimination on Groq
+
+On 2026-07-20 the app moved from Gemini to Groq (`llama-3.3-70b-versatile`
+judge, `llama-3.1-8b-instant` scenarios) for the larger free tier. A fresh live
+A/B on a generated Provincial **Principles of Marketing** scenario:
+
+| Transcript | Overall | Per-indicator |
+| --- | --- | --- |
+| Strong — full 4-P plan, costed to the $20k goal, honest scarcity | **50** | 70, 20, 40, 60, 30 |
+| Middle — general "promote more, do bundles" | **35** | 40, 20, 10, 30, 50 |
+| Weak — vague filler | **10** | 20, 0, 0, 10, 0 |
+
+Monotonic and wide, weak take earns zero strengths — the same shape as Gemini.
+The 70B Llama judge is notably **stricter** at the top: it refused to credit
+"Explain the concept of management" and "Explain the nature of effective
+communication" for an answer that delivered strong *tactics* but never
+*explained the concepts* those PIs name — which is exactly how a real DECA
+judge reads them. Strictness that's grounded in the indicator wording is the
+feature, not a regression.

@@ -35,16 +35,20 @@
 
 export type LlmProvider = 'openai' | 'gemini'
 
-export const LLM_PROVIDER: LlmProvider = 'gemini'
+export const LLM_PROVIDER: LlmProvider = 'openai'
 
-// Used when LLM_PROVIDER === 'openai' (OpenAI-compatible base URL).
+// Used when LLM_PROVIDER === 'openai' (OpenAI-compatible base URL). Groq's free
+// tier: ~1k requests/day, no card — far more headroom for demos than Gemini's
+// 20/day free cap. Key from console.groq.com.
 export const LLM_BASE_URL = 'https://api.groq.com/openai/v1'
 
 // Used when LLM_PROVIDER === 'gemini' (native API — note: no /openai suffix).
 export const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta'
 
-export const MODEL_SCENARIO = 'gemini-2.5-flash' // gemini-2.5-flash-lite was retired ("no longer available to new users")
-export const MODEL_JUDGE = 'gemini-2.5-flash' // stronger model for the graded verdict
+// Groq models. The judge does the reasoning-heavy grading, so it gets the 70B;
+// scenario generation only needs varied, well-formed JSON, so it gets the fast 8B.
+export const MODEL_SCENARIO = 'llama-3.1-8b-instant'
+export const MODEL_JUDGE = 'llama-3.3-70b-versatile' // stronger model for the graded verdict
 
 // Ask for a raw JSON object. Both transports support this (json_object / responseMimeType)
 // and it makes parsing more reliable. If a model rejects it, set false — the defensive

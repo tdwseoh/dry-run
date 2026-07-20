@@ -111,8 +111,11 @@ npm run frames && npm run og    # regenerate the film + social card
 ```
 
 Deploy: import the repo in Vercel, set `LLM_API_KEY`, done. The provider is
-switchable in `api/_lib/config.ts` (Gemini native by default; Groq/OpenRouter/
-local presets documented in the file).
+switchable in `api/_lib/config.ts` — it currently runs on **Groq**
+(`llama-3.1-8b-instant` for scenarios, `llama-3.3-70b-versatile` for the judge)
+because its free tier allows ~1k requests/day versus Gemini's 20; the Gemini
+native transport and OpenRouter/local presets are still one edit away in that
+file. `npm run check:llm` tests whichever provider is active.
 
 ## Judge-me-quickly mode
 
