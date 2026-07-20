@@ -2,6 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 // Fonts installed at build time (not a runtime @import), per the brief.
+// Big Shoulders Display is the headline face (athletic, condensed — a
+// broadcast/competition nameplate); Archivo carries UI + body; JetBrains Mono
+// the instrument readouts.
+import '@fontsource-variable/big-shoulders-display'
 import '@fontsource-variable/archivo'
 import '@fontsource-variable/jetbrains-mono'
 import './index.css'

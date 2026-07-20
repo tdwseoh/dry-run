@@ -15,6 +15,9 @@
 
   --font-display: 'Archivo Variable', 'Archivo', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+  /* Headline face — used decisively on the big titles only (see the headline
+     block near the end of this file). Archivo stays the UI/body font. */
+  --font-hero: 'Big Shoulders Display Variable', 'Archivo Variable', system-ui, sans-serif;
 
   --maxw: 980px;
 }
@@ -3463,4 +3466,50 @@ body {
   line-height: 1.55;
   max-width: 44ch;
   margin: 0 0 10px;
+}
+
+/* ==========================================================================
+   Headline face — Big Shoulders Display on the big titles only
+   (athletic/condensed broadcast nameplate). Archivo keeps UI + body; the
+   mono readouts are untouched. One decisive distinctive face, per the
+   frontend-aesthetics guidance. SplitTitle wraps words in .split-word, which
+   inherits font-family from its heading, so setting the parent is enough.
+   ========================================================================== */
+
+.hero-title,
+.setup-title,
+.showcase-title,
+.community-title,
+.board-title,
+.final-title,
+.beat-title,
+.comp-name,
+.profile-greeting,
+.onboard-title,
+.card-title,
+.home-title,
+.crash-title {
+  font-family: var(--font-hero);
+}
+
+/* Push the marquee titles to the top of the weight axis for the extreme
+   contrast the guide favours, and ease the negative tracking that a condensed
+   face doesn't need. */
+.hero-title,
+.setup-title,
+.showcase-title,
+.community-title,
+.board-title,
+.final-title,
+.profile-greeting {
+  font-weight: 900;
+  letter-spacing: -0.005em;
+}
+
+.beat-title,
+.comp-name,
+.onboard-title,
+.card-title {
+  font-weight: 800;
+  letter-spacing: 0;
 }
