@@ -145,6 +145,25 @@ export const appendLog = (entry: LogEntry): LogEntry[] => {
   return next
 }
 
+/** Replace the whole log (used by demo seeding). Ignores storage failures. */
+export const replaceLog = (entries: LogEntry[]): void => {
+  try {
+    window.localStorage.setItem(LOG_KEY, JSON.stringify(entries))
+  } catch {
+    // Storage blocked.
+  }
+}
+
+/** Remove the stored profile and log (demo teardown). */
+export const clearProfileAndLog = (): void => {
+  try {
+    window.localStorage.removeItem(PROFILE_KEY)
+    window.localStorage.removeItem(LOG_KEY)
+  } catch {
+    // Storage blocked.
+  }
+}
+
 /** Attach a Q&A score to the most recent log entry (the run just judged). */
 export const attachQnaToLatest = (qna: number): LogEntry[] => {
   const log = loadLog()

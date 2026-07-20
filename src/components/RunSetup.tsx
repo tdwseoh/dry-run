@@ -5,6 +5,7 @@ import { DECA_EVENTS, DIFFICULTIES, eventByCode } from '../lib/events'
 import type { Difficulty, RunMode } from '../types'
 import { ErrorNote, LoadingDots } from './Feedback'
 import { Tally } from './Tally'
+import { Tilt } from './Tilt'
 
 // The pre-run setup screen: pick your event, pick the tier you're training
 // for, and go — or hand in the official event PDF instead. This is where a run
@@ -106,22 +107,23 @@ export const RunSetup = ({
 
       <div className="event-grid" role="radiogroup" aria-label="Choose your event">
         {DECA_EVENTS.map((event) => (
-          <button
-            key={event.code}
-            className={`event-card${event.code === selected.code ? ' is-active' : ''}`}
-            role="radio"
-            aria-checked={event.code === selected.code}
-            onClick={() => onEventCode(event.code)}
-          >
-            <span className="event-top">
-              <span className="event-code">{event.code}</span>
-              <span className={`event-format event-format--${event.format}`}>
-                {event.format === 'team' ? 'Team' : 'Individual'}
+          <Tilt key={event.code} strength={6} className="event-tilt">
+            <button
+              className={`event-card${event.code === selected.code ? ' is-active' : ''}`}
+              role="radio"
+              aria-checked={event.code === selected.code}
+              onClick={() => onEventCode(event.code)}
+            >
+              <span className="event-top">
+                <span className="event-code">{event.code}</span>
+                <span className={`event-format event-format--${event.format}`}>
+                  {event.format === 'team' ? 'Team' : 'Individual'}
+                </span>
               </span>
-            </span>
-            <span className="event-name">{event.name}</span>
-            <span className="event-blurb">{event.blurb}</span>
-          </button>
+              <span className="event-name">{event.name}</span>
+              <span className="event-blurb">{event.blurb}</span>
+            </button>
+          </Tilt>
         ))}
       </div>
 

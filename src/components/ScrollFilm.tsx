@@ -129,9 +129,25 @@ export const ScrollFilm = ({ hero }: ScrollFilmProps): JSX.Element => {
     window.addEventListener('resize', onResize)
     apply()
 
+    // Pointer parallax: the canvas drifts gently against the cursor (kept at a
+    // slight overscale so edges never show). Hover-capable devices only; the
+    // CSS transition smooths it and reduced-motion kills the transition.
+    const hoverable =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(hover: hover)').matches
+    const onPointer = (e: PointerEvent): void => {
+      if (!hoverable) return
+      const nx = e.clientX / window.innerWidth - 0.5
+      const ny = e.clientY / window.innerHeight - 0.5
+      canvas.style.transform = `scale(1.06) translate(${(-nx * 16).toFixed(1)}px, ${(-ny * 12).toFixed(1)}px)`
+    }
+    const sticky = canvas.parentElement
+    sticky?.addEventListener('pointermove', onPointer)
+
     return () => {
       window.removeEventListener('scroll', schedule)
       window.removeEventListener('resize', onResize)
+      sticky?.removeEventListener('pointermove', onPointer)
       imagesRef.current = []
     }
   }, [])
@@ -145,6 +161,7 @@ export const ScrollFilm = ({ hero }: ScrollFilmProps): JSX.Element => {
           aria-hidden="true"
         />
         <div className="film-vignette" aria-hidden="true" />
+        <div className="film-fade" aria-hidden="true" />
 
         <div className="film-beat film-beat--hero" ref={heroRef}>
           {hero}

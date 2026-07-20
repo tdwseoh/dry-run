@@ -6,6 +6,7 @@ import { Onboarding } from './components/Onboarding'
 import { Profile } from './components/Profile'
 import { QnaRound } from './components/QnaRound'
 import { RunSetup } from './components/RunSetup'
+import { ScoreBurst } from './components/ScoreBurst'
 import { Sparkline } from './components/Sparkline'
 import { Tally, type TallyMode } from './components/Tally'
 import { Timecode } from './components/Timecode'
@@ -18,6 +19,7 @@ import {
   eventByCode
 } from './lib/events'
 import { trendPoints } from './lib/trend'
+import { clearDemo, isDemoActive, seedDemo } from './lib/demo'
 import {
   computeDelivery,
   paceLabel,
@@ -373,6 +375,24 @@ export const DryRun = (): JSX.Element => {
     setShowOnboarding(false)
   }
 
+  // Demo mode: seed the sample season (judge-explorable dashboard in one
+  // click), or erase it entirely. Both re-sync all state from storage.
+  const exploreDemo = (): void => {
+    seedDemo()
+    setProfile(loadProfile())
+    setLog(loadLog())
+    setHistory(loadHistory())
+    setPhase('profile')
+  }
+
+  const leaveDemo = (): void => {
+    clearDemo()
+    setProfile(null)
+    setLog([])
+    setHistory([])
+    setPhase('home')
+  }
+
   const copyTranscript = (): void => {
     try {
       void navigator.clipboard.writeText(submittedTranscript).then(() => {
@@ -610,6 +630,7 @@ export const DryRun = (): JSX.Element => {
           profile={profile}
           streakDays={currentStreak(log, new Date())}
           onCreateProfile={() => setShowOnboarding(true)}
+          onExploreDemo={exploreDemo}
         />
       ) : (
         <main className="stage">
@@ -620,6 +641,8 @@ export const DryRun = (): JSX.Element => {
               history={history}
               onStartPracticing={() => setPhase('setup')}
               onEditProfile={() => setShowOnboarding(true)}
+              demoActive={isDemoActive()}
+              onClearDemo={leaveDemo}
             />
           )}
 
@@ -733,6 +756,7 @@ export const DryRun = (): JSX.Element => {
 
         {phase === 'onair' && scenario && (
           <section className="screen onair">
+            <div className="rec-vignette" aria-hidden="true" />
             <div className="onair-head">
               <p className="label">
                 {inputMode === 'speech'
@@ -843,6 +867,7 @@ export const DryRun = (): JSX.Element => {
               <div className="scorecard">
                 <p className="label">The verdict</p>
                 <div className="overall">
+                  {compareLine?.text === 'New personal best' && <ScoreBurst />}
                   <ScoreCount value={verdict.overall} />
                   <span className="overall-out">/ 100</span>
                 </div>

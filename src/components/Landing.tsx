@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { DEMO_PROFILE, demoHistory, demoLog } from '../lib/demo'
 import { personalBest, type RunRecord } from '../lib/history'
-import {
-  dayStamp,
-  greetingFor,
-  type CompetitorProfile,
-  type LogEntry
-} from '../lib/profile'
+import { greetingFor, type CompetitorProfile } from '../lib/profile'
 import { CompetitorCard } from './CompetitorCard'
 import { Counters } from './Counters'
+import { Magnetic } from './Magnetic'
 import { Reveal } from './Reveal'
+import { SplitTitle } from './SplitTitle'
+import { Ticker } from './Ticker'
+import { Tilt } from './Tilt'
 import { ScrollFilm } from './ScrollFilm'
 import { Tally } from './Tally'
 import { Timecode } from './Timecode'
@@ -30,54 +30,20 @@ interface LandingProps {
   streakDays: number
   /** Open the create-profile onboarding (final CTA for new visitors). */
   onCreateProfile: () => void
+  /** Seed the sample season and open the demo dashboard. */
+  onExploreDemo: () => void
 }
 
 /** Score → the same mint/amber/red encoding used everywhere else. */
 const chipColor = (score: number): string =>
   score >= 75 ? 'var(--mint)' : score >= 50 ? 'var(--amber)' : 'var(--red)'
 
-// ---------------------------------------------------------------------------
-// SHOWCASE DATA — marketing sections only. The competitor card below renders
-// the REAL CompetitorCard component fed with this sample season (so the
-// showcase is the product, not a mockup); the leaderboard and stories are
-// demo content until a backend exists.
-// ---------------------------------------------------------------------------
-
-const demoDay = (daysAgo: number): string =>
-  dayStamp(new Date(Date.now() - daysAgo * 86_400_000))
-
-const SHOWCASE_PROFILE: CompetitorProfile = {
-  name: 'Avery Chen',
-  school: 'Westmount SS',
-  events: ['PMK', 'MTDM', 'PBM'],
-  goal: 'icdc'
-}
-
-// A believable season: 16 takes over ~3 weeks, trending 58 → 93, fillers
-// falling as the reps add up, finishing on a 4-day streak.
-const SHOWCASE_LOG: LogEntry[] = [
-  [24, 58, 9], [22, 61, 8], [21, 57, 9], [19, 66, 7], [17, 70, 6],
-  [16, 68, 6], [14, 74, 5], [12, 77, 4], [10, 73, 5], [9, 81, 3],
-  [7, 84, 3], [5, 80, 2], [3, 88, 1], [2, 86, 2], [1, 91, 0], [0, 93, 0]
-].map(([daysAgo, score, fillers], i) => ({
-  day: demoDay(daysAgo as number),
-  event: (['PMK', 'PBM', 'MTDM'] as const)[i % 3] as string,
-  score: score as number,
-  minutes: 8 + (i % 4),
-  fillers: fillers as number,
-  ...(i % 5 === 4 ? { qna: 70 + i } : {})
-}))
-
-const SHOWCASE_HISTORY: RunRecord[] = SHOWCASE_LOG.slice(-8)
-  .map((entry, i) => ({
-    at: Date.now() - (7 - i) * 86_400_000,
-    event: entry.event,
-    overall: entry.score,
-    words: 900 + i * 40,
-    durationSeconds: entry.minutes * 60,
-    wpm: 118 + i * 3
-  }))
-  .reverse()
+// Showcase data: the sample season lives in src/lib/demo.ts (shared with the
+// one-click demo dashboard, so the marketing card and the demo agree). The
+// stories and leaderboard below are demo content until a backend exists.
+const SHOWCASE_PROFILE = DEMO_PROFILE
+const SHOWCASE_LOG = demoLog()
+const SHOWCASE_HISTORY = demoHistory()
 
 const STORIES: Array<{ quote: string; who: string }> = [
   {
@@ -181,7 +147,8 @@ export const Landing = ({
   history,
   profile,
   streakDays,
-  onCreateProfile
+  onCreateProfile,
+  onExploreDemo
 }: LandingProps): JSX.Element => {
   const [activeStep, setActiveStep] = useState(0)
   const best = personalBest(history)
@@ -207,8 +174,7 @@ export const Landing = ({
             </p>
           )}
           <h1 className="hero-title">
-            Train like
-            <br />a champion.
+            <SplitTitle text={'Train like\na champion.'} mode="auto" />
           </h1>
           <p className="hero-sub">
             Dry Run is where DECA competitors sharpen up: a fresh roleplay,
@@ -216,15 +182,19 @@ export const Landing = ({
             indicator honestly. Rehearse the room before the room.
           </p>
           <div className="hero-actions">
-            <button
-              className="btn btn--primary btn--lg"
-              onClick={onStartPracticing}
-            >
-              Start practicing
-            </button>
-            <button className="btn btn--ghost btn--lg" onClick={explore}>
-              Explore the platform
-            </button>
+            <Magnetic>
+              <button
+                className="btn btn--primary btn--lg"
+                onClick={onStartPracticing}
+              >
+                Start practicing
+              </button>
+            </Magnetic>
+            <Magnetic>
+              <button className="btn btn--ghost btn--lg" onClick={explore}>
+                Explore the platform
+              </button>
+            </Magnetic>
           </div>
           {history.length > 0 && best !== null && (
             <div className="recent" aria-label="Your recent takes">
@@ -260,6 +230,8 @@ export const Landing = ({
           </p>
         </Reveal>
       </section>
+
+      <Ticker />
 
       {/* Pinned four-phase sequence */}
       <section className="seq">
@@ -341,22 +313,25 @@ export const Landing = ({
           <Reveal>
             <p className="features-kicker">Your competitor identity</p>
             <h2 className="showcase-title">
-              Every take builds
-              <br />
-              your record.
+              <SplitTitle text={'Every take builds\nyour record.'} />
             </h2>
             <p className="showcase-sub">
               Streaks, levels, readiness, achievements — all computed from
               roleplays you actually ran, indicator by indicator. This is a
               real profile card from a sample season.
             </p>
+            <button className="btn btn--ghost showcase-demo" onClick={onExploreDemo}>
+              Explore this dashboard live &#8594;
+            </button>
           </Reveal>
           <Reveal delay={120} className="showcase-card">
-            <CompetitorCard
-              profile={SHOWCASE_PROFILE}
-              log={SHOWCASE_LOG}
-              history={SHOWCASE_HISTORY}
-            />
+            <Tilt strength={5}>
+              <CompetitorCard
+                profile={SHOWCASE_PROFILE}
+                log={SHOWCASE_LOG}
+                history={SHOWCASE_HISTORY}
+              />
+            </Tilt>
           </Reveal>
         </div>
       </section>
@@ -365,7 +340,9 @@ export const Landing = ({
       <section className="community">
         <Reveal>
           <p className="features-kicker">The community</p>
-          <h2 className="community-title">DECA is a team sport.</h2>
+          <h2 className="community-title">
+            <SplitTitle text="DECA is a team sport." />
+          </h2>
         </Reveal>
         <Counters />
         <p className="community-note">Season-one targets — join early.</p>
@@ -387,7 +364,9 @@ export const Landing = ({
       <section className="board">
         <Reveal>
           <p className="features-kicker">School leaderboard</p>
-          <h2 className="board-title">Rep your school.</h2>
+          <h2 className="board-title">
+            <SplitTitle text="Rep your school." />
+          </h2>
           <p className="board-sub">
             Takes logged this season, school against school. Showcase preview —
             live standings arrive with accounts.
@@ -439,22 +418,28 @@ export const Landing = ({
       {/* Final CTA */}
       <section className="final">
         <Reveal>
-          <h2 className="final-title">Your next competition starts now.</h2>
+          <h2 className="final-title">
+            <SplitTitle text={'Your next competition\nstarts now.'} />
+          </h2>
           <p className="final-sub">Draw an event. Beat the clock. See where you stand.</p>
           <div className="final-actions">
-            <button
-              className="btn btn--primary btn--lg"
-              onClick={onStartPracticing}
-            >
-              Start practicing
-            </button>
-            {!profile && (
+            <Magnetic>
               <button
-                className="btn btn--ghost btn--lg"
-                onClick={onCreateProfile}
+                className="btn btn--primary btn--lg"
+                onClick={onStartPracticing}
               >
-                Create your competitor profile
+                Start practicing
               </button>
+            </Magnetic>
+            {!profile && (
+              <Magnetic>
+                <button
+                  className="btn btn--ghost btn--lg"
+                  onClick={onCreateProfile}
+                >
+                  Create your competitor profile
+                </button>
+              </Magnetic>
             )}
           </div>
         </Reveal>

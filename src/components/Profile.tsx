@@ -26,6 +26,9 @@ interface ProfileProps {
   history: RunRecord[]
   onStartPracticing: () => void
   onEditProfile: () => void
+  /** True when the dashboard is showing the seeded sample season. */
+  demoActive: boolean
+  onClearDemo: () => void
 }
 
 export const Profile = ({
@@ -33,7 +36,9 @@ export const Profile = ({
   log,
   history,
   onStartPracticing,
-  onEditProfile
+  onEditProfile,
+  demoActive,
+  onClearDemo
 }: ProfileProps): JSX.Element => {
   const now = new Date()
   const streak = currentStreak(log, now)
@@ -49,6 +54,17 @@ export const Profile = ({
 
   return (
     <section className="screen profile">
+      {demoActive && (
+        <div className="demo-banner" role="status">
+          <span>
+            Sample season — this is demo data so you can explore the dashboard.
+          </span>
+          <button className="btn btn--ghost btn--sm" onClick={onClearDemo}>
+            Clear demo &amp; start fresh
+          </button>
+        </div>
+      )}
+
       <div className="profile-head">
         <div>
           <p className="label">Competitor dashboard</p>

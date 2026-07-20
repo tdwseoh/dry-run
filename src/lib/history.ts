@@ -91,6 +91,24 @@ export const saveRun = (run: RunRecord): RunRecord[] => {
   return next
 }
 
+/** Replace the whole history (used by demo seeding). Ignores storage failures. */
+export const replaceHistory = (runs: RunRecord[]): void => {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(runs.slice(0, MAX_RUNS)))
+  } catch {
+    // Storage blocked.
+  }
+}
+
+/** Remove all stored history (demo teardown). */
+export const clearHistory = (): void => {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // Storage blocked.
+  }
+}
+
 /** Highest overall in a history list, or null when empty. */
 export const personalBest = (history: RunRecord[]): number | null =>
   history.length === 0

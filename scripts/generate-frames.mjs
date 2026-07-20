@@ -41,6 +41,21 @@ const frameSvg = (t) => {
   const hue = hueAt(t)
   const accent = `hsl(${hue}, 88%, 58%)`
 
+  // Two starfield layers drifting at different speeds — cheap parallax depth.
+  const stars = [0, 1]
+    .map((layer) =>
+      Array.from({ length: 70 }, (_, i) => {
+        const seed = i + layer * 500 + 700
+        const drift = t * (layer === 0 ? 26 : 60)
+        const sx = ((rand(seed) * (W + 120) + drift) % (W + 120)) - 60
+        const sy = rand(seed + 1) * H
+        const size = 0.6 + rand(seed + 2) * (layer === 0 ? 1 : 1.6)
+        const op = (0.08 + rand(seed + 3) * (layer === 0 ? 0.16 : 0.3)).toFixed(2)
+        return `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${size.toFixed(1)}" fill="#cdd6ea" opacity="${op}"/>`
+      }).join('\n')
+    )
+    .join('\n')
+
   // The tally ring tilts open and rotates as the run progresses.
   const ringTilt = lerp(10, 74, Math.sin(t * Math.PI) ** 1.2)
   const ringSpin = t * 150 - 15
@@ -57,16 +72,35 @@ const frameSvg = (t) => {
     })
     .join('\n')
 
-  // Orbiting particles: fixed orbits, phase advances with t.
+  // A wide counter-rotating outer plane — depth without clutter.
+  const counterR = ringR + 130
+  const counterRy = counterR * Math.sin(((90 - ringTilt) * Math.PI) / 360)
+  const counterPlane = `<ellipse cx="${cx}" cy="${cy}" rx="${counterR}" ry="${counterRy.toFixed(1)}"
+    fill="none" stroke="${accent}" stroke-width="0.8" opacity="0.18"
+    stroke-dasharray="3 14" transform="rotate(${-ringSpin * 0.6} ${cx} ${cy})"/>`
+
+  // Orbiting particles with motion trails: each dot drags a short arc of its
+  // own orbit behind it, so scrubbing reads as movement even in a still.
+  const tiltSin = Math.sin((ringTilt * Math.PI) / 180)
   const particles = Array.from({ length: 24 }, (_, i) => {
     const orbit = ringR + rand(i) * 120 - 36
-    const phase = rand(i + 100) * TAU + t * TAU * (0.3 + rand(i + 200) * 0.5)
+    const speed = 0.3 + rand(i + 200) * 0.5
+    const phase = rand(i + 100) * TAU + t * TAU * speed
     const px = cx + Math.cos(phase) * orbit
-    const py =
-      cy + Math.sin(phase) * orbit * Math.sin((ringTilt * Math.PI) / 180)
+    const py = cy + Math.sin(phase) * orbit * tiltSin
     const size = 1.2 + rand(i + 300) * 2.4
     const op = 0.2 + rand(i + 400) * 0.55
-    return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${size.toFixed(1)}" fill="${accent}" opacity="${op.toFixed(2)}"/>`
+    // Trail: sampled points a few degrees back along the same ellipse.
+    const trailLen = 0.18 + speed * 0.1
+    const steps = 6
+    const trail = Array.from({ length: steps }, (_, s) => {
+      const a = phase - ((s + 1) / steps) * trailLen
+      return `${(cx + Math.cos(a) * orbit).toFixed(1)},${(cy + Math.sin(a) * orbit * tiltSin).toFixed(1)}`
+    }).join(' ')
+    return `<polyline points="${px.toFixed(1)},${py.toFixed(1)} ${trail}" fill="none"
+      stroke="${accent}" stroke-width="${(size * 0.7).toFixed(1)}" stroke-linecap="round"
+      opacity="${(op * 0.35).toFixed(2)}"/>
+    <circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${size.toFixed(1)}" fill="${accent}" opacity="${op.toFixed(2)}"/>`
   }).join('\n')
 
   // A faint waveform strip that swells during the on-air stretch of the film.
@@ -99,9 +133,16 @@ const frameSvg = (t) => {
     <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
       <feGaussianBlur stdDeviation="26"/>
     </filter>
+    <radialGradient id="horizon" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="hsl(${hue}, 70%, 30%)" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="hsl(${hue}, 70%, 20%)" stop-opacity="0"/>
+    </radialGradient>
   </defs>
   <rect width="${W}" height="${H}" fill="url(#bg)"/>
+  ${stars}
+  <ellipse cx="${cx}" cy="${H + 60}" rx="${W * 0.75}" ry="170" fill="url(#horizon)" opacity="${(0.5 + Math.sin(t * Math.PI) * 0.3).toFixed(2)}"/>
   <circle cx="${cx}" cy="${cy}" r="${(orbR * 1.9).toFixed(1)}" fill="url(#orb)" opacity="0.32" filter="url(#glow)"/>
+  ${counterPlane}
   ${rings}
   ${particles}
   ${bars}
