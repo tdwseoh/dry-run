@@ -116,8 +116,23 @@ const geminiComplete = async (params: CompletionParams): Promise<string> => {
 /**
  * Call the active provider and return its text content as a single string.
  *
+ * On failure the thrown error is tagged with the active provider + base URL, so
+ * a deployment's function logs make it obvious whether a bad key hit Groq or a
+ * stale build is still calling Gemini — the exact ambiguity that bites when the
+ * provider is switched but the env var or the build is out of sync.
+ *
  * @throws Error on transport / API failures (the handler converts these to a 5xx
  *   so the browser can show an in-voice retry).
  */
-export const complete = (params: CompletionParams): Promise<string> =>
-  LLM_PROVIDER === 'gemini' ? geminiComplete(params) : openaiComplete(params)
+export const complete = async (params: CompletionParams): Promise<string> => {
+  try {
+    return LLM_PROVIDER === 'gemini'
+      ? await geminiComplete(params)
+      : await openaiComplete(params)
+  } catch (err) {
+    const where =
+      LLM_PROVIDER === 'gemini' ? 'gemini (native)' : `openai-compatible ${LLM_BASE_URL}`
+    const detail = err instanceof Error ? err.message : String(err)
+    throw new Error(`LLM call failed [provider=${LLM_PROVIDER}, ${where}, model=${params.model}]: ${detail}`)
+  }
+}
