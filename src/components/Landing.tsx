@@ -1,31 +1,19 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-import { primeAlarm } from '../lib/alarm'
 import { personalBest, type RunRecord } from '../lib/history'
-import type { RunMode } from '../types'
-import { ErrorNote, LoadingDots } from './Feedback'
 import { Reveal } from './Reveal'
 import { ScrollFilm } from './ScrollFilm'
 import { Tally } from './Tally'
 import { Timecode } from './Timecode'
 
-// The Apple-style scroll landing shown at phase === 'home'. Big type, scroll-in
-// reveals, and a pinned sequence whose visual changes state (scenario → prep →
-// on air → verdict) as the captions scroll past it. `onStart` kicks off the real
-// run; while it's generating (or if it errors) a full-screen launch overlay covers
-// the page so the transition into the app feels intentional.
-//
-// Two ways in: generate a fresh scenario, or upload the OFFICIAL event PDF —
-// the PDF is read entirely in the browser (pdf.js, lazy-loaded) and only its
-// text goes to the server for structuring.
+// The scroll landing shown at phase === 'home'. The film hero scrubs the tally
+// sequence; below it, scroll-in reveals and a pinned sequence walk the visitor
+// through a run. Starting a run now goes through the setup screen (event +
+// tier + PDF upload live there) — the landing's job is the story.
 
 interface LandingProps {
-  onStart: (mode: RunMode, sourceText?: string) => void
-  starting: boolean
-  error: string | null
-  /** Selected run format; lives in the parent so the header CTA matches. */
-  mode: RunMode
-  onModeChange: (mode: RunMode) => void
+  /** Open the run-setup screen (event picker, tier, PDF upload). */
+  onStartPracticing: () => void
   /** Past takes (newest first) — renders the recent-takes strip when non-empty. */
   history: RunRecord[]
 }
@@ -100,64 +88,14 @@ const SeqStep = ({
 }
 
 export const Landing = ({
-  onStart,
-  starting,
-  error,
-  mode,
-  onModeChange,
+  onStartPracticing,
   history
 }: LandingProps): JSX.Element => {
   const [activeStep, setActiveStep] = useState(0)
   const best = personalBest(history)
 
-  // PDF-upload flow: extraction happens here in the browser; only the text is
-  // handed up. `reading` covers the extraction wait, `pdfError` local failures.
-  const [reading, setReading] = useState(false)
-  const [pdfError, setPdfError] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  // Kept so "Try again" after a server-side failure can resend the same text.
-  const lastPdfTextRef = useRef<string | undefined>(undefined)
-
-  const startGenerated = (): void => {
-    lastPdfTextRef.current = undefined
-    onStart(mode)
-  }
-
-  const handleFile = (file: File | null): void => {
-    if (!file) return
-    primeAlarm() // picking a file is the user gesture that unlocks audio
-    setPdfError(null)
-    setReading(true)
-    import('../lib/pdf')
-      .then(async ({ extractPdfText, PdfReadError }) => {
-        try {
-          const text = await extractPdfText(file)
-          lastPdfTextRef.current = text
-          onStart(mode, text)
-        } catch (err) {
-          setPdfError(
-            err instanceof PdfReadError
-              ? err.message
-              : "Couldn't read that PDF. Try a different file."
-          )
-        } finally {
-          setReading(false)
-        }
-      })
-      .catch(() => {
-        setReading(false)
-        setPdfError('The PDF reader failed to load. Check your connection and try again.')
-      })
-    // Allow re-picking the same file after an error.
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  const retry = (): void => {
-    if (pdfError) {
-      setPdfError(null)
-      return
-    }
-    onStart(mode, lastPdfTextRef.current)
+  const explore = (): void => {
+    document.querySelector('.statement')?.scrollIntoView({ behavior: 'smooth' })
   }
 
   return (
@@ -170,67 +108,25 @@ export const Landing = ({
             <Tally mode="onair" />
           </div>
           <h1 className="hero-title">
-            Rehearse the room
-            <br />
-            before the room.
+            Train like
+            <br />a champion.
           </h1>
           <p className="hero-sub">
-            Dry Run is a solo trainer for DECA roleplay. One realistic scenario, ten
-            minutes on the clock, then an honest, indicator-by-indicator verdict — no
-            partner required.
+            Dry Run is where DECA competitors sharpen up: a fresh roleplay,
+            competition timing, and a judge that scores every performance
+            indicator honestly. Rehearse the room before the room.
           </p>
-          <div
-            className="mode-toggle"
-            role="radiogroup"
-            aria-label="Run format"
-          >
-            <button
-              className={`mode-opt${mode === 'solo' ? ' is-active' : ''}`}
-              role="radio"
-              aria-checked={mode === 'solo'}
-              onClick={() => onModeChange('solo')}
-            >
-              <span className="mode-name">Individual</span>
-              <span className="mode-timing">10:00 prep · 10:00 on air</span>
-            </button>
-            <button
-              className={`mode-opt${mode === 'team' ? ' is-active' : ''}`}
-              role="radio"
-              aria-checked={mode === 'team'}
-              onClick={() => onModeChange('team')}
-            >
-              <span className="mode-name">Team</span>
-              <span className="mode-timing">30:00 prep · 15:00 on air</span>
-            </button>
-          </div>
           <div className="hero-actions">
             <button
               className="btn btn--primary btn--lg"
-              onClick={startGenerated}
-              disabled={starting || reading}
+              onClick={onStartPracticing}
             >
-              {starting ? 'Cueing…' : 'Start a run'}
+              Start practicing
             </button>
-            <button
-              className="btn btn--ghost btn--lg"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={starting || reading}
-            >
-              Upload the event PDF
+            <button className="btn btn--ghost btn--lg" onClick={explore}>
+              Explore the platform
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf,.pdf"
-              className="visually-hidden"
-              aria-label="Upload an official DECA roleplay PDF"
-              onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-            />
           </div>
-          <p className="upload-hint">
-            Have the official roleplay? Upload the event PDF and rehearse the
-            real scenario — graded on its printed performance indicators.
-          </p>
           {history.length > 0 && best !== null && (
             <div className="recent" aria-label="Your recent takes">
               <span className="recent-label">Recent takes</span>
@@ -372,39 +268,16 @@ export const Landing = ({
       {/* Final CTA */}
       <section className="final">
         <Reveal>
-          <h2 className="final-title">Your take is waiting.</h2>
-          <p className="final-sub">Pick nothing. Start a run. See where you stand.</p>
+          <h2 className="final-title">Your next competition starts now.</h2>
+          <p className="final-sub">Draw an event. Beat the clock. See where you stand.</p>
           <button
             className="btn btn--primary btn--lg"
-            onClick={startGenerated}
-            disabled={starting || reading}
+            onClick={onStartPracticing}
           >
-            {starting ? 'Cueing…' : 'Start a run'}
+            Start practicing
           </button>
         </Reveal>
       </section>
-
-      {/* Launch overlay: covers the page during PDF reading / generation, or on failure. */}
-      {(starting || reading || error || pdfError) && (
-        <div className="launch-overlay" role="status" aria-live="polite">
-          {pdfError || error ? (
-            <ErrorNote message={pdfError ?? error ?? ''} onRetry={retry} />
-          ) : (
-            <div className="launch-inner">
-              <Tally mode="onair" />
-              <p className="launch-text">
-                {reading ? 'Reading the brief…' : 'Rolling camera…'}
-              </p>
-              <p className="launch-sub">
-                {reading
-                  ? 'Extracting the official scenario from your PDF.'
-                  : 'Setting the scene.'}
-              </p>
-              <LoadingDots />
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }

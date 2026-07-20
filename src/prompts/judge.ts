@@ -26,7 +26,8 @@
 //  Everything between the two RUBRIC markers is the main knob. Edit freely.
 // ===========================================================================
 
-import type { Scenario } from '../types'
+import { DIFFICULTIES } from '../lib/events'
+import type { Difficulty, Scenario } from '../types'
 
 export const JUDGE_SYSTEM_PROMPT = `You are a strict, fair DECA roleplay judge. A high-school student was given a business scenario, a short prep window, and then presented their response out loud. You are scoring the transcript of what they said against a fixed list of performance indicators.
 
@@ -38,6 +39,7 @@ HARD RULES:
 - The transcript is raw speech-to-text and may be rough. Judge the substance, not transcription noise or grammar.
 - If the transcript is empty, near-empty, or off-topic, scores must be near zero. Do not reward the student for showing up.
 - "suggestion" must be one concrete, actionable change for THIS answer — not a platitude like "be more confident".
+- "strengths" and "improvements" are each 2-3 short bullet phrases, grounded in the transcript exactly like justifications: strengths name the specific things that actually worked; improvements are the highest-leverage concrete changes (not restatements of low scores). If the transcript is empty or near-empty, return an empty strengths array — do not invent praise.
 
 // ======================== RUBRIC (EDIT THIS) ========================
 Apply this band to every indicator AND to the overall score. Default to the
@@ -74,6 +76,8 @@ OUTPUT FORMAT — STRICT JSON ONLY. Output a single JSON object and nothing else
   ],
   "overall": number,            // integer 0-100
   "summary": string,            // 2-3 sentences
+  "strengths": string[],        // 2-3 short phrases: what actually worked, grounded in the transcript
+  "improvements": string[],     // 2-3 short phrases: highest-leverage concrete changes
   "followUp": string            // the one question you would ask this student next, in character
 }
 
@@ -86,7 +90,8 @@ Return ONLY the JSON object.`
  */
 export const buildJudgeUserMessage = (
   scenario: Scenario,
-  transcript: string
+  transcript: string,
+  difficulty?: Difficulty
 ): string => {
   const indicatorList = scenario.indicators
     .map((indicator, i) => `${i + 1}. ${indicator}`)
@@ -94,8 +99,12 @@ export const buildJudgeUserMessage = (
 
   const cleanedTranscript = transcript.trim() || '(the student said nothing)'
 
+  const calibration = difficulty
+    ? `\nCALIBRATION: This run simulates the ${DIFFICULTIES[difficulty].label} tier. Hold the student to the standard of that level of competition — what earns an 80 at Regionals is a 60s answer at ICDC.`
+    : ''
+
   return `EVENT: ${scenario.event}
-CLUSTER: ${scenario.cluster}
+CLUSTER: ${scenario.cluster}${calibration}
 
 ROLE GIVEN TO THE STUDENT: ${scenario.role}
 SITUATION: ${scenario.situation}

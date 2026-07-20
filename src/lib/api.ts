@@ -3,6 +3,7 @@
 // holds the key. Both wrappers surface a clean ApiError message for the UI.
 
 import type {
+  Difficulty,
   JudgeRequest,
   JudgeResult,
   RebuttalRequest,
@@ -34,25 +35,39 @@ const readErrorMessage = async (res: Response): Promise<string> => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
+export interface GenerateOptions {
+  /** Extracted text of an official event PDF — the server structures THAT roleplay. */
+  sourceText?: string
+  /** Event code from src/lib/events.ts (generated path only). */
+  eventCode?: string
+  /** Competition tier (generated path only). */
+  difficulty?: Difficulty
+}
+
 /**
- * Ask the proxy for a scenario. With no arguments the server invents one; pass
- * `sourceText` (the extracted text of an official event PDF) to have the server
- * faithfully structure THAT roleplay instead.
+ * Ask the proxy for a scenario. With no options the server invents one for the
+ * default event; pass `eventCode` + `difficulty` to steer generation, or
+ * `sourceText` to faithfully structure an official PDF instead.
  *
  * @param signal optional AbortSignal to cancel an in-flight request.
  * @throws ApiError with a display-ready message on any non-2xx response.
  */
 export const generateScenario = async (
-  sourceText?: string,
+  options: GenerateOptions = {},
   signal?: AbortSignal
 ): Promise<Scenario> => {
+  const body = {
+    ...(options.sourceText !== undefined && { sourceText: options.sourceText }),
+    ...(options.eventCode !== undefined && { event: options.eventCode }),
+    ...(options.difficulty !== undefined && { difficulty: options.difficulty })
+  }
   const res = await fetch('/api/generate-scenario', {
     method: 'POST',
     signal,
-    ...(sourceText
+    ...(Object.keys(body).length > 0
       ? {
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sourceText })
+          body: JSON.stringify(body)
         }
       : {})
   })
@@ -68,9 +83,10 @@ export const generateScenario = async (
 export const judgeTranscript = async (
   scenario: Scenario,
   transcript: string,
+  difficulty?: Difficulty,
   signal?: AbortSignal
 ): Promise<JudgeResult> => {
-  const body: JudgeRequest = { scenario, transcript }
+  const body: JudgeRequest = { scenario, transcript, difficulty }
   const res = await fetch('/api/judge', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -134,12 +134,32 @@ export const asJudgeResult = (data: unknown): JudgeResult => {
       ? data.followUp.trim()
       : undefined
 
+  // Optional strengths/improvements lists — same tolerance: bad shapes are
+  // dropped (never fail the verdict), entries are trimmed, blanks removed,
+  // and each list is capped so a rambling model can't flood the UI.
+  const asPhrases = (value: unknown): string[] | undefined => {
+    if (!Array.isArray(value)) return undefined
+    const phrases = value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+      .slice(0, 4)
+    return phrases.length > 0 ? phrases : undefined
+  }
+  const strengths = asPhrases(data.strengths)
+  const improvements = asPhrases(data.improvements)
+
   const result: JudgeResult = {
     scores: parsedScores,
     overall: clampScore(overall),
     summary
   }
-  return followUp === undefined ? result : { ...result, followUp }
+  return {
+    ...result,
+    ...(strengths !== undefined && { strengths }),
+    ...(improvements !== undefined && { improvements }),
+    ...(followUp !== undefined && { followUp })
+  }
 }
 
 export const parseJudgeResult = (raw: string): JudgeResult =>

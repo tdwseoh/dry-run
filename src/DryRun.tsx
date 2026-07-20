@@ -3,10 +3,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ErrorNote, LoadingDots } from './components/Feedback'
 import { Landing } from './components/Landing'
 import { QnaRound } from './components/QnaRound'
+import { RunSetup } from './components/RunSetup'
+import { Sparkline } from './components/Sparkline'
 import { Tally, type TallyMode } from './components/Tally'
 import { Timecode } from './components/Timecode'
 import { ApiError, generateScenario, judgeTranscript } from './lib/api'
-import { playAlarm, primeAlarm } from './lib/alarm'
+import { playAlarm } from './lib/alarm'
+import {
+  DEFAULT_DIFFICULTY,
+  DEFAULT_EVENT_CODE,
+  DIFFICULTIES,
+  eventByCode
+} from './lib/events'
+import { trendPoints } from './lib/trend'
 import {
   computeDelivery,
   paceLabel,
@@ -20,10 +29,10 @@ import {
   type RunRecord
 } from './lib/history'
 import { isSpeechSupported, startSpeech, type SpeechSession } from './lib/speech'
-import type { JudgeResult, RunMode, Scenario } from './types'
+import type { Difficulty, JudgeResult, RunMode, Scenario } from './types'
 
 // The whole app is one state machine keyed on `phase`. Everything else is derived.
-type Phase = 'home' | 'prep' | 'onair' | 'verdict'
+type Phase = 'home' | 'setup' | 'prep' | 'onair' | 'verdict'
 
 // How the presentation is being captured: live speech, or the typed fallback.
 type InputMode = 'speech' | 'typed'
@@ -174,6 +183,9 @@ export const DryRun = (): JSX.Element => {
 
   const [phase, setPhase] = useState<Phase>('home')
   const [mode, setMode] = useState<RunMode>('solo')
+  // Run setup: which event the simulation draws from, and the tier it's judged at.
+  const [eventCode, setEventCode] = useState(DEFAULT_EVENT_CODE)
+  const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY)
   const [scenario, setScenario] = useState<Scenario | null>(null)
   // True when the scenario came from an uploaded official PDF (fixed — no redraw).
   const [fromPdf, setFromPdf] = useState(false)
@@ -227,11 +239,14 @@ export const DryRun = (): JSX.Element => {
 
   // ---- Transitions --------------------------------------------------------
 
-  const startRun = (runMode: RunMode, sourceText?: string): void => {
-    primeAlarm() // must happen inside the click gesture so the alarm can sound later
+  // Launch a run from the setup screen. Generated runs derive their format from
+  // the selected event; official-PDF runs carry an explicit format override.
+  // (The alarm is primed inside RunSetup's click handlers — a user gesture.)
+  const startRun = (sourceText?: string, modeOverride?: RunMode): void => {
+    const runMode = modeOverride ?? eventByCode(eventCode).format
     setError(null)
     setGenerating(true)
-    generateScenario(sourceText)
+    generateScenario(sourceText ? { sourceText } : { eventCode, difficulty })
       .then((next) => {
         resetCapture()
         setVerdict(null)
@@ -258,7 +273,7 @@ export const DryRun = (): JSX.Element => {
   const redrawScenario = (): void => {
     if (redrawing) return
     setRedrawing(true)
-    generateScenario()
+    generateScenario({ eventCode, difficulty })
       .then((next) => {
         setScenario(next)
         setNotes('')
@@ -295,7 +310,8 @@ export const DryRun = (): JSX.Element => {
     setJudgeAttempt((n) => n + 1)
   }
 
-  const newTake = (): void => {
+  // Back into the training loop: a new take returns to setup, not the landing.
+  const newTake = (target: 'setup' | 'home' = 'setup'): void => {
     setScenario(null)
     setVerdict(null)
     setError(null)
@@ -303,7 +319,7 @@ export const DryRun = (): JSX.Element => {
     setDelivery(null)
     setRunContext(null)
     resetCapture()
-    setPhase('home')
+    setPhase(target)
   }
 
   const copyTranscript = (): void => {
@@ -385,7 +401,7 @@ export const DryRun = (): JSX.Element => {
     const controller = new AbortController()
     setJudging(true)
     setError(null)
-    judgeTranscript(scenario, submittedTranscript, controller.signal)
+    judgeTranscript(scenario, submittedTranscript, difficulty, controller.signal)
       .then((result) => {
         // Snapshot the record BEFORE saving so we can say "beat your best" honestly.
         const prev = loadHistory()
@@ -435,7 +451,9 @@ export const DryRun = (): JSX.Element => {
         ? onairRemaining
         : phase === 'home'
           ? timings.prep
-          : 0
+          : phase === 'setup'
+            ? TIMINGS[eventByCode(eventCode).format].prep
+            : 0
 
   // One line comparing this take to the record, shown next to the verdict score.
   const compareLine = ((): { text: string; tone: 'up' | 'down' | 'flat' } | null => {
@@ -470,10 +488,10 @@ export const DryRun = (): JSX.Element => {
             <div className="rack-right">
               <button
                 className="nav-cta"
-                onClick={() => startRun(mode)}
+                onClick={() => setPhase('setup')}
                 disabled={generating}
               >
-                Start a run
+                Start practicing
               </button>
             </div>
           </>
@@ -496,15 +514,29 @@ export const DryRun = (): JSX.Element => {
 
       {phase === 'home' ? (
         <Landing
-          onStart={startRun}
-          starting={generating}
-          error={error}
-          mode={mode}
-          onModeChange={setMode}
+          onStartPracticing={() => setPhase('setup')}
           history={history}
         />
       ) : (
         <main className="stage">
+          {phase === 'setup' && (
+            <RunSetup
+              eventCode={eventCode}
+              onEventCode={setEventCode}
+              difficulty={difficulty}
+              onDifficulty={setDifficulty}
+              pdfMode={mode}
+              onPdfMode={setMode}
+              starting={generating}
+              error={error}
+              onLaunch={startRun}
+              onBack={() => {
+                setError(null)
+                setPhase('home')
+              }}
+            />
+          )}
+
           {phase === 'prep' && scenario && (
           <section className="screen prep">
             <div className="prep-grid">
@@ -710,12 +742,48 @@ export const DryRun = (): JSX.Element => {
                   <ScoreCount value={verdict.overall} />
                   <span className="overall-out">/ 100</span>
                 </div>
+                <p className="calibration">
+                  Judged at the {DIFFICULTIES[difficulty].label} standard
+                  {fromPdf ? ' · Official PDF' : ''}
+                </p>
                 {compareLine && (
                   <p className={`compare compare--${compareLine.tone}`}>
                     {compareLine.text}
                   </p>
                 )}
                 <p className="summary">{verdict.summary}</p>
+
+                {((verdict.strengths?.length ?? 0) > 0 ||
+                  (verdict.improvements?.length ?? 0) > 0) && (
+                  <div className="verdict-lists">
+                    {(verdict.strengths?.length ?? 0) > 0 && (
+                      <div className="vlist vlist--good">
+                        <p className="label">What worked</p>
+                        <ul>
+                          {verdict.strengths?.map((item, i) => (
+                            <li key={i}>
+                              <span className="vlist-mark">&#10003;</span>
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {(verdict.improvements?.length ?? 0) > 0 && (
+                      <div className="vlist vlist--fix">
+                        <p className="label">Raise the score</p>
+                        <ul>
+                          {verdict.improvements?.map((item, i) => (
+                            <li key={i}>
+                              <span className="vlist-mark">&#8594;</span>
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {delivery && (
                   <div className="delivery" aria-label="Delivery statistics">
@@ -812,9 +880,22 @@ export const DryRun = (): JSX.Element => {
                   </details>
                 )}
 
+                {history.length >= 2 && (
+                  <div className="trend" aria-label="Score trend">
+                    <p className="label">Your last {Math.min(history.length, 10)} takes</p>
+                    <Sparkline points={trendPoints(history)} />
+                  </div>
+                )}
+
                 <div className="verdict-actions">
-                  <button className="btn btn--primary" onClick={newTake}>
+                  <button className="btn btn--primary" onClick={() => newTake()}>
                     New take
+                  </button>
+                  <button
+                    className="btn btn--ghost"
+                    onClick={() => newTake('home')}
+                  >
+                    Back to home
                   </button>
                 </div>
               </div>

@@ -130,6 +130,36 @@ describe('parseJudgeResult', () => {
     expect(result.overall).toBe(0)
   })
 
+  it('keeps clean strengths/improvements and trims entries', () => {
+    const withLists = {
+      ...JSON.parse(validJudge),
+      strengths: ['  Clear open  ', 'Named the tradeoff'],
+      improvements: ['Quantify the plan']
+    }
+    const result = asJudgeResult(withLists)
+    expect(result.strengths).toEqual(['Clear open', 'Named the tradeoff'])
+    expect(result.improvements).toEqual(['Quantify the plan'])
+  })
+
+  it('drops malformed strengths/improvements instead of failing the verdict', () => {
+    const bad = {
+      ...JSON.parse(validJudge),
+      strengths: 'not an array',
+      improvements: [42, '   ', 'Real advice']
+    }
+    const result = asJudgeResult(bad)
+    expect(result.strengths).toBeUndefined()
+    expect(result.improvements).toEqual(['Real advice'])
+  })
+
+  it('caps strengths/improvements at four entries', () => {
+    const flood = {
+      ...JSON.parse(validJudge),
+      strengths: ['a', 'b', 'c', 'd', 'e', 'f']
+    }
+    expect(asJudgeResult(flood).strengths).toHaveLength(4)
+  })
+
   it('rejects a result with no scores', () => {
     expect(() =>
       parseJudgeResult('{"scores":[],"overall":50,"summary":"x"}')

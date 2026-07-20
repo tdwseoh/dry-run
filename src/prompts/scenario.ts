@@ -2,7 +2,7 @@
 // Scenario-generation prompt (editable).
 //
 // This is the prompt used by /api/generate-scenario to invent one DECA roleplay
-// for the "Principles of Business Management and Administration" event. Tune the
+// for a chosen event (src/lib/events.ts) at a chosen difficulty tier. Tune the
 // wording freely — the only hard requirement is that the model returns STRICT
 // JSON matching the `Scenario` shape in src/types.ts (the serverless handler
 // validates it and returns a 502 on malformed output).
@@ -14,30 +14,47 @@
 // the real ones (either here in the prompt, or by post-processing the response).
 // ---------------------------------------------------------------------------
 
-export const SCENARIO_SYSTEM_PROMPT = `You are a DECA event author. You write realistic roleplay scenarios for the "Principles of Business Management and Administration" event, part of DECA's Business Management + Administration career cluster. The audience is high-school students.
+import type { DecaEvent, DifficultySpec } from '../lib/events'
+
+/**
+ * Builds the scenario-author system prompt for a specific event + difficulty
+ * tier. The event supplies the career area and format (solo vs. team roles);
+ * the difficulty supplies the indicator count and complexity instruction.
+ */
+export const buildScenarioSystemPrompt = (
+  event: DecaEvent,
+  difficulty: DifficultySpec
+): string => `You are a DECA event author. You write realistic roleplay scenarios for the "${event.name}" event, part of DECA's ${event.cluster} career cluster. The audience is high-school students.
 
 Produce ONE scenario as STRICT JSON only. Output a single JSON object and nothing else — no prose, no explanation, no markdown code fences. The object must match exactly this shape:
 
 {
-  "event": string,        // "Principles of Business Management and Administration"
-  "cluster": string,      // "Business Management + Administration"
+  "event": string,        // "${event.name}"
+  "cluster": string,      // "${event.cluster}"
   "role": string,         // second person, e.g. "You are a shift manager at a downtown coffee shop."
   "situation": string,    // 2-4 sentences describing a concrete business problem to solve
   "judgeRole": string,    // who the judge plays, e.g. "your district manager"
-  "indicators": string[]  // 4-5 short performance indicators the presentation is judged on
+  "indicators": string[]  // exactly ${difficulty.indicators} short performance indicators the presentation is judged on
 }
 
 Rules:
-- The role must be an entry-level management or administration position a high-schooler can picture holding.
-- The situation must be a specific, decision-forcing problem (a scheduling conflict, a customer-service breakdown, a small budgeting tradeoff, a workplace-ethics question, a broken process) — never a vague "grow the business" ask. Include one or two concrete details (a number, a deadline, a named constraint).
-- Vary the industry, role, and problem every time: retail, quick-service food, a gym, a movie theater, a hotel front desk, a delivery/logistics depot, an event venue, and so on. Do not reuse the same setup.
-- Each indicator must read like a DECA performance indicator: a short skill phrase, usually starting with a verb, e.g. "Explain the nature of effective communication", "Demonstrate problem-solving skills", "Describe the nature of managerial ethics".
+- The role must be an entry-level position in this event's career area that a high-schooler can picture holding${
+  event.format === 'team'
+    ? '. This is a TEAM DECISION-MAKING event: write the role in second-person plural ("You and your partner are…") and make the problem big enough for two presenters'
+    : ''
+}.
+- DIFFICULTY CALIBRATION (${difficulty.label} tier): ${difficulty.complexity}
+- The situation must be decision-forcing — never a vague "grow the business" ask. Include concrete details (numbers, deadlines, named constraints) the student must actually address.
+- Vary the industry, setting, and problem every time. Do not reuse the same setup.
+- Each indicator must read like a DECA performance indicator for the ${event.cluster} cluster: a short skill phrase, usually starting with a verb, e.g. "Explain the nature of effective communication", "Demonstrate problem-solving skills".
+- Produce exactly ${difficulty.indicators} indicators.
 - Keep everything appropriate and realistic for high-school students.
 
 Return ONLY the JSON object.`
 
-export const SCENARIO_USER_PROMPT =
-  'Write a fresh Principles of Business Management and Administration roleplay now. Make it distinct from a generic textbook example. Return only the JSON object.'
+/** The per-run ask that pairs with buildScenarioSystemPrompt. */
+export const buildScenarioUserMessage = (event: DecaEvent): string =>
+  `Write a fresh ${event.name} roleplay now. Make it distinct from a generic textbook example. Return only the JSON object.`
 
 // ---------------------------------------------------------------------------
 // Extraction prompt — used when the student uploads an OFFICIAL event PDF.

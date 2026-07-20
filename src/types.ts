@@ -8,6 +8,10 @@
 // 10:00 on air; team decision-making events give 30:00 prep and 15:00 on air.
 export type RunMode = 'solo' | 'team'
 
+// Competition tier the run simulates. Drives scenario complexity, how many
+// performance indicators are generated, and the judge's calibration line.
+export type Difficulty = 'regional' | 'provincial' | 'icdc'
+
 export interface Scenario {
   event: string
   cluster: string
@@ -28,6 +32,10 @@ export interface JudgeResult {
   scores: IndicatorScore[]
   overall: number // 0-100
   summary: string // 2-3 sentences
+  /** 2-3 short phrases naming what actually worked. Optional + tolerant, like followUp. */
+  strengths?: string[]
+  /** 2-3 short phrases: the highest-leverage concrete changes. Optional + tolerant. */
+  improvements?: string[]
   /** The one probing question a real judge would ask next. Optional so older
    *  model output (without the field) still validates. */
   followUp?: string
@@ -37,6 +45,8 @@ export interface JudgeResult {
 export interface JudgeRequest {
   scenario: Scenario
   transcript: string
+  /** Competition tier for judge calibration; omitted for PDF runs started before selection existed. */
+  difficulty?: Difficulty
 }
 
 // The judge's verdict on the student's answer to the follow-up question.

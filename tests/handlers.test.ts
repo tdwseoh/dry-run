@@ -121,6 +121,37 @@ describe('generate-scenario handler', () => {
     expect(state.statusCode).toBe(400)
     expect(completeMock).not.toHaveBeenCalled()
   })
+
+  it('steers generation by event code and difficulty tier', async () => {
+    completeMock.mockResolvedValue(JSON.stringify(VALID_SCENARIO))
+    const { state, res } = makeRes()
+    await scenarioHandler(
+      asReq({ body: { event: 'HTDM', difficulty: 'icdc' } }),
+      res
+    )
+    expect(state.statusCode).toBe(200)
+    const call = completeMock.mock.calls[0]?.[0] as { system: string; user: string }
+    expect(call.system).toContain('Hospitality Services Team Decision Making')
+    expect(call.system).toContain('exactly 7')
+    expect(call.system).toMatch(/TEAM DECISION-MAKING/)
+    expect(call.user).toContain('Hospitality Services Team Decision Making')
+  })
+
+  it('rejects an invalid difficulty with 400', async () => {
+    const { state, res } = makeRes()
+    await scenarioHandler(asReq({ body: { difficulty: 'nationals' } }), res)
+    expect(state.statusCode).toBe(400)
+    expect(completeMock).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the default event for unknown codes', async () => {
+    completeMock.mockResolvedValue(JSON.stringify(VALID_SCENARIO))
+    const { state, res } = makeRes()
+    await scenarioHandler(asReq({ body: { event: 'ZZZ' } }), res)
+    expect(state.statusCode).toBe(200)
+    const call = completeMock.mock.calls[0]?.[0] as { system: string }
+    expect(call.system).toContain('Principles of Business Management')
+  })
 })
 
 describe('judge handler', () => {
@@ -149,6 +180,25 @@ describe('judge handler', () => {
       res
     )
     expect(state.statusCode).toBe(502)
+  })
+
+  it('passes the difficulty tier into the judge calibration line', async () => {
+    completeMock.mockResolvedValue(VALID_JUDGE)
+    const { state, res } = makeRes()
+    await judgeHandler(
+      asReq({
+        body: {
+          scenario: VALID_SCENARIO,
+          transcript: 'anything',
+          difficulty: 'icdc'
+        }
+      }),
+      res
+    )
+    expect(state.statusCode).toBe(200)
+    const call = completeMock.mock.calls[0]?.[0] as { user: string }
+    expect(call.user).toContain('ICDC')
+    expect(call.user).toMatch(/CALIBRATION/)
   })
 })
 

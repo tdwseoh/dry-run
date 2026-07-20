@@ -1,11 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 import {
+  DEFAULT_DIFFICULTY,
+  DIFFICULTIES,
+  eventByCode,
+  isDifficulty
+} from '../src/lib/events.js'
+import {
   buildScenarioExtractUserMessage,
-  SCENARIO_EXTRACT_SYSTEM_PROMPT,
-  SCENARIO_SYSTEM_PROMPT,
-  SCENARIO_USER_PROMPT
+  buildScenarioSystemPrompt,
+  buildScenarioUserMessage,
+  SCENARIO_EXTRACT_SYSTEM_PROMPT
 } from '../src/prompts/scenario.js'
+import type { Difficulty } from '../src/types'
 import {
   MODEL_SCENARIO,
   SCENARIO_MAX_TOKENS,
@@ -22,24 +29,52 @@ import {
 // Longest document text we'll forward to the model (roleplays are 2-4 pages).
 const MAX_SOURCE_CHARS = 24_000
 
+interface ScenarioRequest {
+  /** Extracted official-PDF text; when present the handler extracts, not invents. */
+  sourceText: string | null
+  /** Event code from src/lib/events.ts; unknown codes fall back to the default. */
+  eventCode: string | undefined
+  difficulty: Difficulty
+}
+
 /**
- * Optional request body: `{ sourceText }` carries the extracted text of an
- * official event PDF; when present the handler extracts instead of inventing.
- * Returns null for absent/empty, throws SyntaxError when malformed.
+ * Optional request body: `{ sourceText }` (official PDF path) or
+ * `{ event, difficulty }` (generated path). All fields optional; malformed
+ * shapes throw SyntaxError → 400.
  */
-const readSourceText = (body: unknown): string | null => {
-  if (body === undefined || body === null || body === '') return null
+const readRequest = (body: unknown): ScenarioRequest => {
+  const empty: ScenarioRequest = {
+    sourceText: null,
+    eventCode: undefined,
+    difficulty: DEFAULT_DIFFICULTY
+  }
+  if (body === undefined || body === null || body === '') return empty
   const parsed: unknown = typeof body === 'string' ? JSON.parse(body) : body
-  if (!isRecord(parsed) || parsed.sourceText === undefined) return null
-  if (typeof parsed.sourceText !== 'string') {
-    throw new SyntaxError('sourceText must be a string')
+  if (!isRecord(parsed)) return empty
+
+  let sourceText: string | null = null
+  if (parsed.sourceText !== undefined) {
+    if (typeof parsed.sourceText !== 'string') {
+      throw new SyntaxError('sourceText must be a string')
+    }
+    sourceText = parsed.sourceText.trim() || null
+    if (sourceText && sourceText.length > MAX_SOURCE_CHARS) {
+      throw new SyntaxError('sourceText is too long')
+    }
   }
-  const text = parsed.sourceText.trim()
-  if (!text) return null
-  if (text.length > MAX_SOURCE_CHARS) {
-    throw new SyntaxError('sourceText is too long')
+
+  if (parsed.event !== undefined && typeof parsed.event !== 'string') {
+    throw new SyntaxError('event must be a string code')
   }
-  return text
+  if (parsed.difficulty !== undefined && !isDifficulty(parsed.difficulty)) {
+    throw new SyntaxError('difficulty must be regional | provincial | icdc')
+  }
+
+  return {
+    sourceText,
+    eventCode: parsed.event as string | undefined,
+    difficulty: isDifficulty(parsed.difficulty) ? parsed.difficulty : DEFAULT_DIFFICULTY
+  }
 }
 
 // Proxies scenario generation to the LLM. Exists for one reason: to read the API
@@ -58,22 +93,28 @@ export default async function handler(
     return
   }
 
-  let sourceText: string | null
+  let request: ScenarioRequest
   try {
-    sourceText = readSourceText(req.body)
+    request = readRequest(req.body)
   } catch (err) {
     console.error('[generate-scenario] bad request body:', err)
-    res.status(400).json({ error: 'The uploaded document could not be used.' })
+    res.status(400).json({ error: 'The scenario request was malformed.' })
     return
   }
+
+  const { sourceText } = request
+  const event = eventByCode(request.eventCode)
+  const tier = DIFFICULTIES[request.difficulty]
 
   try {
     const raw = await complete({
       model: MODEL_SCENARIO,
-      system: sourceText ? SCENARIO_EXTRACT_SYSTEM_PROMPT : SCENARIO_SYSTEM_PROMPT,
+      system: sourceText
+        ? SCENARIO_EXTRACT_SYSTEM_PROMPT
+        : buildScenarioSystemPrompt(event, tier),
       user: sourceText
         ? buildScenarioExtractUserMessage(sourceText)
-        : SCENARIO_USER_PROMPT,
+        : buildScenarioUserMessage(event),
       maxTokens: SCENARIO_MAX_TOKENS,
       // Extraction should be faithful, not creative.
       temperature: sourceText ? 0.2 : SCENARIO_TEMPERATURE

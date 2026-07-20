@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
+import { isDifficulty } from '../src/lib/events.js'
 import { buildJudgeUserMessage, JUDGE_SYSTEM_PROMPT } from '../src/prompts/judge.js'
-import type { Scenario } from '../src/types'
+import type { Difficulty, Scenario } from '../src/types'
 import { JUDGE_MAX_TOKENS, JUDGE_TEMPERATURE, MODEL_JUDGE } from './_lib/config.js'
 import { complete } from './_lib/llm.js'
 import { asScenario, isRecord, LlmOutputError, parseJudgeResult } from './_lib/parse.js'
@@ -9,6 +10,7 @@ import { asScenario, isRecord, LlmOutputError, parseJudgeResult } from './_lib/p
 interface JudgeBody {
   scenario: Scenario
   transcript: string
+  difficulty: Difficulty | undefined
 }
 
 /** Validate the request body: it must carry a valid scenario and a transcript string. */
@@ -19,7 +21,12 @@ const readBody = (body: unknown): JudgeBody => {
   }
   // asScenario throws LlmOutputError on a bad shape; re-label it as a bad request.
   const scenario = asScenario(parsed.scenario)
-  return { scenario, transcript: parsed.transcript }
+  return {
+    scenario,
+    transcript: parsed.transcript,
+    // Unknown difficulty values degrade to uncalibrated rather than erroring.
+    difficulty: isDifficulty(parsed.difficulty) ? parsed.difficulty : undefined
+  }
 }
 
 // Proxies judging to the LLM. Receives the scenario + transcript, returns a
@@ -47,7 +54,11 @@ export default async function handler(
     const raw = await complete({
       model: MODEL_JUDGE,
       system: JUDGE_SYSTEM_PROMPT,
-      user: buildJudgeUserMessage(payload.scenario, payload.transcript),
+      user: buildJudgeUserMessage(
+        payload.scenario,
+        payload.transcript,
+        payload.difficulty
+      ),
       maxTokens: JUDGE_MAX_TOKENS,
       temperature: JUDGE_TEMPERATURE
     })
