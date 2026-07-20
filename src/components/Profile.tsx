@@ -4,10 +4,15 @@ import {
   achievements,
   currentStreak,
   greetingFor,
+  levelFor,
   perEventStats,
+  readinessScore,
+  totalXp,
   type CompetitorProfile,
   type LogEntry
 } from '../lib/profile'
+import { downloadShareCard } from '../lib/sharecard'
+import { trendPoints } from '../lib/trend'
 import { CompetitorCard } from './CompetitorCard'
 
 // The competitor dashboard (phase === 'profile'): identity card, the honest
@@ -46,6 +51,25 @@ export const Profile = ({
   const byEvent = perEventStats(log)
   const totalMinutes = log.reduce((sum, e) => sum + e.minutes, 0)
 
+  const shareCard = (): void => {
+    const scores = log.map((e) => e.score)
+    downloadShareCard({
+      name: profile.name,
+      school: profile.school,
+      events: profile.events,
+      levelName: levelFor(totalXp(log)).name,
+      readiness: readinessScore(log, now),
+      streak,
+      runs: log.length,
+      average: scores.length
+        ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length)
+        : null,
+      best: scores.length ? Math.max(...scores) : null,
+      points: trendPoints(history),
+      badges: all.filter((a) => a.earnedOn !== null).map((a) => a.emoji)
+    })
+  }
+
   // Recommended next move: the trained event with the weakest average (2+ runs
   // so one rough take doesn't define it), else just extending the streak.
   const weakest = byEvent
@@ -80,6 +104,9 @@ export const Profile = ({
         <div className="profile-head-actions">
           <button className="btn btn--primary" onClick={onStartPracticing}>
             Start practicing
+          </button>
+          <button className="btn btn--ghost btn--sm" onClick={shareCard}>
+            Share card
           </button>
           <button className="btn btn--ghost btn--sm" onClick={onEditProfile}>
             Edit profile

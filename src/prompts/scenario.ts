@@ -19,11 +19,14 @@ import type { DecaEvent, DifficultySpec } from '../lib/events'
 /**
  * Builds the scenario-author system prompt for a specific event + difficulty
  * tier. The event supplies the career area and format (solo vs. team roles);
- * the difficulty supplies the indicator count and complexity instruction.
+ * the difficulty supplies the indicator count and complexity instruction;
+ * `candidateIndicators` is a sampled slate of official-style PIs the model must
+ * choose from VERBATIM (src/lib/indicators.ts) — it never invents its own.
  */
 export const buildScenarioSystemPrompt = (
   event: DecaEvent,
-  difficulty: DifficultySpec
+  difficulty: DifficultySpec,
+  candidateIndicators: string[]
 ): string => `You are a DECA event author. You write realistic roleplay scenarios for the "${event.name}" event, part of DECA's ${event.cluster} career cluster. The audience is high-school students.
 
 Produce ONE scenario as STRICT JSON only. Output a single JSON object and nothing else — no prose, no explanation, no markdown code fences. The object must match exactly this shape:
@@ -46,8 +49,8 @@ Rules:
 - DIFFICULTY CALIBRATION (${difficulty.label} tier): ${difficulty.complexity}
 - The situation must be decision-forcing — never a vague "grow the business" ask. Include concrete details (numbers, deadlines, named constraints) the student must actually address.
 - Vary the industry, setting, and problem every time. Do not reuse the same setup.
-- Each indicator must read like a DECA performance indicator for the ${event.cluster} cluster: a short skill phrase, usually starting with a verb, e.g. "Explain the nature of effective communication", "Demonstrate problem-solving skills".
-- Produce exactly ${difficulty.indicators} indicators.
+- PERFORMANCE INDICATORS: choose exactly ${difficulty.indicators} from the OFFICIAL candidate list below — the ones a real judge could most plausibly grade against the situation you wrote. Copy each chosen indicator VERBATIM, character for character. Do NOT invent, reword, merge, or add indicators.
+${candidateIndicators.map((pi) => `  - ${pi}`).join('\n')}
 - Keep everything appropriate and realistic for high-school students.
 
 Return ONLY the JSON object.`

@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "check:llm": "node --env-file=.env scripts/check-llm.mjs",
     "test:judge": "node --env-file=.env --import tsx scripts/test-judge.ts",
-    "frames": "node scripts/generate-frames.mjs"
+    "frames": "node scripts/generate-frames.mjs",
+    "og": "node scripts/generate-og.mjs"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.1.1",

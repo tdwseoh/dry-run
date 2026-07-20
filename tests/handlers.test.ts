@@ -135,6 +135,13 @@ describe('generate-scenario handler', () => {
     expect(call.system).toContain('exactly 7')
     expect(call.system).toMatch(/TEAM DECISION-MAKING/)
     expect(call.user).toContain('Hospitality Services Team Decision Making')
+    // The official candidate PI slate must be in the prompt, verbatim-locked:
+    // 7 (ICDC) + 4 spares = 11 bank members, all from the Hospitality bank.
+    expect(call.system).toContain('VERBATIM')
+    const { indicatorsForCluster } = await import('../src/lib/indicators')
+    const bank = indicatorsForCluster('Hospitality + Tourism')
+    const present = bank.filter((pi) => call.system.includes(pi))
+    expect(present).toHaveLength(11)
   })
 
   it('rejects an invalid difficulty with 400', async () => {

@@ -6,6 +6,7 @@ import {
   eventByCode,
   isDifficulty
 } from '../src/lib/events.js'
+import { sampleIndicators } from '../src/lib/indicators.js'
 import {
   buildScenarioExtractUserMessage,
   buildScenarioSystemPrompt,
@@ -111,7 +112,13 @@ export default async function handler(
       model: MODEL_SCENARIO,
       system: sourceText
         ? SCENARIO_EXTRACT_SYSTEM_PROMPT
-        : buildScenarioSystemPrompt(event, tier),
+        : // Sampled slate of official-style PIs (a few spares beyond the tier's
+          // count) the model must choose from verbatim.
+          buildScenarioSystemPrompt(
+            event,
+            tier,
+            sampleIndicators(event.cluster, tier.indicators + 4)
+          ),
       user: sourceText
         ? buildScenarioExtractUserMessage(sourceText)
         : buildScenarioUserMessage(event),
