@@ -13,6 +13,8 @@ interface QnaRoundProps {
   scenario: Scenario
   transcript: string
   question: string
+  /** Called once per scored answer — lets the app log the Q&A result. */
+  onScored?: (score: number) => void
 }
 
 /**
@@ -25,7 +27,8 @@ interface QnaRoundProps {
 export const QnaRound = ({
   scenario,
   transcript,
-  question
+  question,
+  onScored
 }: QnaRoundProps): JSX.Element => {
   const [answer, setAnswer] = useState('')
   const [interim, setInterim] = useState('')
@@ -90,6 +93,7 @@ export const QnaRound = ({
       .then((verdict) => {
         setResult(verdict)
         setJudging(false)
+        onScored?.(verdict.score)
       })
       .catch((err: unknown) => {
         setJudging(false)

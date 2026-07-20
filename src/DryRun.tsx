@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ErrorNote, LoadingDots } from './components/Feedback'
 import { Landing } from './components/Landing'
+import { Onboarding } from './components/Onboarding'
+import { Profile } from './components/Profile'
 import { QnaRound } from './components/QnaRound'
 import { RunSetup } from './components/RunSetup'
 import { Sparkline } from './components/Sparkline'
@@ -28,11 +30,32 @@ import {
   saveRun,
   type RunRecord
 } from './lib/history'
+import {
+  appendLog,
+  attachQnaToLatest,
+  currentStreak,
+  dayStamp,
+  levelFor,
+  loadLog,
+  loadProfile,
+  newlyEarned,
+  saveProfile,
+  totalXp,
+  type Achievement,
+  type CompetitorProfile,
+  type LogEntry
+} from './lib/profile'
 import { isSpeechSupported, startSpeech, type SpeechSession } from './lib/speech'
 import type { Difficulty, JudgeResult, RunMode, Scenario } from './types'
 
 // The whole app is one state machine keyed on `phase`. Everything else is derived.
-type Phase = 'home' | 'setup' | 'prep' | 'onair' | 'verdict'
+type Phase = 'home' | 'setup' | 'prep' | 'onair' | 'verdict' | 'profile'
+
+/** The gamification beats of the run that just finished, shown on the verdict. */
+interface RunMoments {
+  streak: number
+  unlocked: Achievement[]
+}
 
 // How the presentation is being captured: live speech, or the typed fallback.
 type InputMode = 'speech' | 'typed'
@@ -219,6 +242,12 @@ export const DryRun = (): JSX.Element => {
   const [history, setHistory] = useState<RunRecord[]>(() => loadHistory())
   const [runContext, setRunContext] = useState<RunContext | null>(null)
 
+  // Competitor identity + persistent practice log (gamification source of truth).
+  const [profile, setProfile] = useState<CompetitorProfile | null>(() => loadProfile())
+  const [log, setLog] = useState<LogEntry[]>(() => loadLog())
+  const [runMoments, setRunMoments] = useState<RunMoments | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
   const speechRef = useRef<SpeechSession | null>(null)
   const onairStartedAtRef = useRef<number | null>(null)
 
@@ -318,8 +347,30 @@ export const DryRun = (): JSX.Element => {
     setSubmittedTranscript('')
     setDelivery(null)
     setRunContext(null)
+    setRunMoments(null)
     resetCapture()
     setPhase(target)
+  }
+
+  // The Q&A rebuttal lands after the run was logged — attach its score to the
+  // latest entry and surface any unlock it triggers (e.g. Under pressure).
+  const recordQna = (score: number): void => {
+    const before = loadLog()
+    const after = attachQnaToLatest(score)
+    setLog(after)
+    const unlocked = newlyEarned(before, after)
+    if (unlocked.length > 0) {
+      setRunMoments((prev) => ({
+        streak: prev?.streak ?? currentStreak(after, new Date()),
+        unlocked: [...(prev?.unlocked ?? []), ...unlocked]
+      }))
+    }
+  }
+
+  const completeOnboarding = (next: CompetitorProfile): void => {
+    saveProfile(next)
+    setProfile(next)
+    setShowOnboarding(false)
   }
 
   const copyTranscript = (): void => {
@@ -421,6 +472,21 @@ export const DryRun = (): JSX.Element => {
             wpm: stats.wpm
           })
         )
+        // Append to the persistent practice log and capture the gamification
+        // beats (streak day, fresh unlocks) for the verdict screen.
+        const before = loadLog()
+        const after = appendLog({
+          day: dayStamp(new Date()),
+          event: fromPdf ? scenario.event : eventCode,
+          score: result.overall,
+          minutes: Math.max(1, Math.round(stats.durationSeconds / 60)),
+          fillers: stats.fillerTotal
+        })
+        setLog(after)
+        setRunMoments({
+          streak: currentStreak(after, new Date()),
+          unlocked: newlyEarned(before, after)
+        })
         setVerdict(result)
         setJudging(false)
       })
@@ -475,17 +541,42 @@ export const DryRun = (): JSX.Element => {
 
   return (
     <div className="app">
-      <header className={`rack${phase === 'home' ? ' rack--nav' : ''}`}>
+      <header
+        className={`rack${phase === 'home' || phase === 'profile' ? ' rack--nav' : ''}`}
+      >
         <div className="rack-left">
           <span className="rack-glyph" aria-hidden="true">
             &#9654;
           </span>
           <span className="wordmark">Dry Run</span>
         </div>
-        {phase === 'home' ? (
+        {phase === 'home' || phase === 'profile' ? (
           <>
             <div className="rack-center" />
             <div className="rack-right">
+              {profile ? (
+                <button
+                  className="profile-chip"
+                  onClick={() =>
+                    setPhase(phase === 'profile' ? 'home' : 'profile')
+                  }
+                  aria-label={`Open ${profile.name}'s competitor profile`}
+                >
+                  <span className="profile-chip-name">{profile.name.split(' ')[0]}</span>
+                  <span className="profile-chip-level">
+                    {levelFor(totalXp(log)).name}
+                    {currentStreak(log, new Date()) > 0 &&
+                      ` · 🔥${currentStreak(log, new Date())}`}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setShowOnboarding(true)}
+                >
+                  Create profile
+                </button>
+              )}
               <button
                 className="nav-cta"
                 onClick={() => setPhase('setup')}
@@ -516,9 +607,21 @@ export const DryRun = (): JSX.Element => {
         <Landing
           onStartPracticing={() => setPhase('setup')}
           history={history}
+          profile={profile}
+          streakDays={currentStreak(log, new Date())}
         />
       ) : (
         <main className="stage">
+          {phase === 'profile' && profile && (
+            <Profile
+              profile={profile}
+              log={log}
+              history={history}
+              onStartPracticing={() => setPhase('setup')}
+              onEditProfile={() => setShowOnboarding(true)}
+            />
+          )}
+
           {phase === 'setup' && (
             <RunSetup
               eventCode={eventCode}
@@ -751,6 +854,25 @@ export const DryRun = (): JSX.Element => {
                     {compareLine.text}
                   </p>
                 )}
+                {runMoments &&
+                  (runMoments.streak > 1 || runMoments.unlocked.length > 0) && (
+                    <div className="moments" aria-label="Progress from this take">
+                      {runMoments.streak > 1 && (
+                        <span className="moment moment--streak">
+                          🔥 Streak extended — day {runMoments.streak}
+                        </span>
+                      )}
+                      {runMoments.unlocked.map((a, i) => (
+                        <span
+                          className="moment moment--unlock"
+                          key={a.id}
+                          style={{ animationDelay: `${(i + 1) * 140}ms` }}
+                        >
+                          {a.emoji} Unlocked: {a.title}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 <p className="summary">{verdict.summary}</p>
 
                 {((verdict.strengths?.length ?? 0) > 0 ||
@@ -857,6 +979,7 @@ export const DryRun = (): JSX.Element => {
                     scenario={scenario}
                     transcript={submittedTranscript}
                     question={verdict.followUp}
+                    onScored={recordQna}
                   />
                 )}
 
@@ -891,6 +1014,24 @@ export const DryRun = (): JSX.Element => {
                   <button className="btn btn--primary" onClick={() => newTake()}>
                     New take
                   </button>
+                  {profile ? (
+                    <button
+                      className="btn btn--ghost"
+                      onClick={() => {
+                        setRunMoments(null)
+                        setPhase('profile')
+                      }}
+                    >
+                      View your profile
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn--ghost"
+                      onClick={() => setShowOnboarding(true)}
+                    >
+                      Create your competitor profile
+                    </button>
+                  )}
                   <button
                     className="btn btn--ghost"
                     onClick={() => newTake('home')}
@@ -903,6 +1044,14 @@ export const DryRun = (): JSX.Element => {
           </section>
         )}
         </main>
+      )}
+
+      {showOnboarding && (
+        <Onboarding
+          initial={profile}
+          onComplete={completeOnboarding}
+          onDismiss={() => setShowOnboarding(false)}
+        />
       )}
     </div>
   )

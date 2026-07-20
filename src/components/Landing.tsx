@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { personalBest, type RunRecord } from '../lib/history'
+import { greetingFor, type CompetitorProfile } from '../lib/profile'
 import { Reveal } from './Reveal'
 import { ScrollFilm } from './ScrollFilm'
 import { Tally } from './Tally'
@@ -16,6 +17,10 @@ interface LandingProps {
   onStartPracticing: () => void
   /** Past takes (newest first) — renders the recent-takes strip when non-empty. */
   history: RunRecord[]
+  /** Competitor identity, once created — turns the hero into a greeting. */
+  profile: CompetitorProfile | null
+  /** Current practice streak in days (0 when none). */
+  streakDays: number
 }
 
 /** Score → the same mint/amber/red encoding used everywhere else. */
@@ -89,7 +94,9 @@ const SeqStep = ({
 
 export const Landing = ({
   onStartPracticing,
-  history
+  history,
+  profile,
+  streakDays
 }: LandingProps): JSX.Element => {
   const [activeStep, setActiveStep] = useState(0)
   const best = personalBest(history)
@@ -107,6 +114,13 @@ export const Landing = ({
           <div className="hero-tally">
             <Tally mode="onair" />
           </div>
+          {profile && (
+            <p className="hero-greeting">
+              {greetingFor(new Date().getHours())}, {profile.name.split(' ')[0]}
+              {streakDays > 0 ? ` — 🔥 day ${streakDays}` : ''}. Ready for
+              today&rsquo;s take?
+            </p>
+          )}
           <h1 className="hero-title">
             Train like
             <br />a champion.
