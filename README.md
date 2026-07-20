@@ -14,10 +14,12 @@ Live: **https://dry-run-git-main-tdwseoh12.vercel.app**
 - **It's a simulation, not a quiz.** Real DECA timing (10:00/10:00 individual,
   30:00/15:00 team decision-making), a standby ring with an alarm, a pulsing
   ON AIR tally, live speech-to-text — the pressure is the product.
-- **The judge doesn't flatter.** The rubric was tuned against strong, weak,
-  and confidently-empty transcripts until the score gap was defensible
-  (`npm run test:judge` runs the A/B harness against the live model). Every
-  per-indicator score must cite what you actually said; no evidence, low score.
+- **The judge doesn't flatter.** Same scenario, same rubric, live model: a
+  specific costed plan scored **85**, a confident but off-topic answer **50**,
+  and polished filler **25** — with zero strengths returned for the filler,
+  because the rubric forbids inventing praise. The receipts, including raw
+  model output, are in **[docs/judge-calibration.md](docs/judge-calibration.md)**;
+  reproduce with `npm run test:judge`.
 - **Every number is earned.** Streaks, XP levels, achievements, and the
   documented readiness formula all derive from your practice log. There is no
   fake gamification anywhere in the product — showcase sections on the

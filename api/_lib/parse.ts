@@ -30,6 +30,16 @@ const clampScore = (value: number): number =>
   Math.max(0, Math.min(100, Math.round(value)))
 
 /**
+ * Strip list numbering the model echoes back from the prompt. The judge user
+ * message presents indicators as a numbered list ("1. Explain the nature of…"),
+ * and models routinely echo the number along with the text — which would
+ * render as "1. Explain the nature of…" inside the scorecard row. Observed in
+ * live output, so it is normalised here rather than trusted upstream.
+ */
+const stripIndicatorNumbering = (text: string): string =>
+  text.trim().replace(/^\(?\d{1,2}[).:-]\s+/, '')
+
+/**
  * Pull a single JSON object out of raw model text. Handles the two things models
  * do even when told not to: wrap the JSON in ```json ... ``` fences, and add a
  * stray sentence before or after it. We strip fences, then slice from the first
@@ -116,7 +126,7 @@ export const asJudgeResult = (data: unknown): JudgeResult => {
       throw new LlmOutputError(`Judge score #${i} is missing required fields`)
     }
     return {
-      indicator,
+      indicator: stripIndicatorNumbering(indicator),
       score: clampScore(score),
       justification,
       suggestion

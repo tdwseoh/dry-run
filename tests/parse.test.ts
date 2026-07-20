@@ -130,6 +130,36 @@ describe('parseJudgeResult', () => {
     expect(result.overall).toBe(0)
   })
 
+  it('strips list numbering the model echoes from the prompt', () => {
+    // Observed live: the judge echoes "1. Describe the nature of…" because the
+    // user message presents the indicators as a numbered list.
+    const numbered = {
+      ...JSON.parse(validJudge),
+      scores: [
+        { indicator: '1. Communication', score: 70, justification: 'j', suggestion: 's' },
+        { indicator: '2) Problem solving', score: 60, justification: 'j', suggestion: 's' },
+        { indicator: '(3) Ethics', score: 50, justification: 'j', suggestion: 's' },
+        { indicator: 'Budgeting basics', score: 40, justification: 'j', suggestion: 's' }
+      ]
+    }
+    expect(asJudgeResult(numbered).scores.map((s) => s.indicator)).toEqual([
+      'Communication',
+      'Problem solving',
+      'Ethics',
+      'Budgeting basics'
+    ])
+  })
+
+  it('does not mangle indicators that legitimately start with digits', () => {
+    const tricky = {
+      ...JSON.parse(validJudge),
+      scores: [
+        { indicator: '30-day retention planning', score: 70, justification: 'j', suggestion: 's' }
+      ]
+    }
+    expect(asJudgeResult(tricky).scores[0]?.indicator).toBe('30-day retention planning')
+  })
+
   it('keeps clean strengths/improvements and trims entries', () => {
     const withLists = {
       ...JSON.parse(validJudge),
