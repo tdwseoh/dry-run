@@ -5,6 +5,7 @@ import { personalBest, type RunRecord } from '../lib/history'
 import type { RunMode } from '../types'
 import { ErrorNote, LoadingDots } from './Feedback'
 import { Reveal } from './Reveal'
+import { ScrollFilm } from './ScrollFilm'
 import { Tally } from './Tally'
 import { Timecode } from './Timecode'
 
@@ -161,8 +162,9 @@ export const Landing = ({
 
   return (
     <div className="landing">
-      {/* Hero */}
-      <section className="hero">
+      {/* Hero — rides on the scroll film as its 0% beat */}
+      <ScrollFilm
+        hero={
         <div className="hero-inner">
           <div className="hero-tally">
             <Tally mode="onair" />
@@ -249,12 +251,9 @@ export const Landing = ({
               </span>
             </div>
           )}
-          <div className="scroll-cue" aria-hidden="true">
-            <span>Scroll</span>
-            <span className="chev">&#8964;</span>
-          </div>
         </div>
-      </section>
+        }
+      />
 
       {/* Statement */}
       <section className="statement">

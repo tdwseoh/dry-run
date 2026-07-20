@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:llm": "node --env-file=.env scripts/check-llm.mjs",
-    "test:judge": "node --env-file=.env --import tsx scripts/test-judge.ts"
+    "test:judge": "node --env-file=.env --import tsx scripts/test-judge.ts",
+    "frames": "node scripts/generate-frames.mjs"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.1.1",
@@ -28,6 +29,7 @@
     "@types/react-dom": "^18.3.1",
     "@vercel/node": "^3.2.24",
     "@vitejs/plugin-react": "^4.3.4",
+    "sharp": "^0.35.3",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
