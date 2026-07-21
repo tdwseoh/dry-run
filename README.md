@@ -52,6 +52,15 @@ Live: **https://dry-run-git-main-tdwseoh12.vercel.app**
    locally) with streaks, four XP levels, nine derivable achievements, a
    readiness ring, per-event averages, and a downloadable **share card**
    rendered on canvas.
+6. **The training log** — every take is archived in full. Reopen any past run
+   and re-read its complete scorecard, strengths, delivery read and tape,
+   exactly as it was scored — your work never evaporates.
+7. **Road to your goal** — the goal you pick at onboarding drives a milestone
+   track (break 85, hold a 7-day streak, handle a Q&A, hit a readiness
+   threshold…) and a **daily focus** that recommends today's drill and one-tap
+   launches it with the right event and tier pre-selected.
+8. **Own your data** — Settings exports your entire season to a file, re-imports
+   it on another device, or wipes it. Local-first, no account, no server.
 
 ![Competitor card](docs/competitor-card.png)
 
@@ -77,7 +86,7 @@ src/
   lib/                  pure, tested: events, indicators (PI bank), profile (streaks/XP/
                         readiness/achievements), trend, delivery, history, demo, sharecard…
 scripts/                frame generator (SVG→WebP film), OG-card generator, judge A/B harness
-tests/                  99 vitest tests — parsers, handlers (LLM mocked), every derivation
+tests/                  119 vitest tests — parsers, handlers (LLM mocked), every derivation
 ```
 
 Design decisions worth knowing:
@@ -86,9 +95,10 @@ Design decisions worth knowing:
   scrubbed by scroll position on a sticky canvas — no video tag, no scroll
   library. Frames regenerate with `npm run frames`; the color story follows a
   run: amber standby → red on air → mint verdict.
-- **Storage is two modules** (`lib/history.ts`, `lib/profile.ts`) behind pure,
-  tested parsers. Swapping localStorage for Supabase means reimplementing those
-  two modules; no component touches storage directly.
+- **Storage is a handful of modules** (`lib/history.ts`, `lib/profile.ts`,
+  `lib/archive.ts`) behind pure, tested parsers, with `lib/backup.ts` bundling
+  them for export/import. Swapping localStorage for Supabase means reimplementing
+  those load/save internals; no component touches storage directly.
 - **Honest derivations**: the readiness formula (50% recent scoring, 20%
   trajectory, 20% consistency, 10% volume) and every achievement rule are pure
   functions with unit tests — see `tests/profile.test.ts`.
@@ -100,12 +110,12 @@ Design decisions worth knowing:
 
 ```bash
 npm install
-cp .env.example .env      # add LLM_API_KEY (free Gemini key: aistudio.google.com/apikey)
+cp .env.example .env      # add LLM_API_KEY (free Groq key: console.groq.com — the active provider)
 vercel dev                # NOT `vite` — the /api/* functions need the Vercel runtime
 ```
 
 ```bash
-npm run typecheck && npm test   # 99 tests, LLM mocked
+npm run typecheck && npm test   # 119 tests, LLM mocked
 npm run test:judge              # A/B the judge rubric against the live model
 npm run frames && npm run og    # regenerate the film + social card
 ```
