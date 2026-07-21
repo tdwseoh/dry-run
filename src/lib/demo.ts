@@ -6,6 +6,7 @@
 // The same sample season feeds the landing's platform-showcase card, so the
 // marketing page and the demo dashboard always agree.
 
+import { clearArchive, replaceArchive, type ArchivedRun } from './archive'
 import { clearHistory, replaceHistory, type RunRecord } from './history'
 import {
   clearProfileAndLog,
@@ -15,6 +16,7 @@ import {
   type CompetitorProfile,
   type LogEntry
 } from './profile'
+import { eventByCode } from './events'
 
 const DEMO_FLAG_KEY = 'dry-run-demo-v1'
 
@@ -62,6 +64,73 @@ export const demoHistory = (): RunRecord[] =>
     }))
     .reverse()
 
+/**
+ * A handful of full archived runs so the training log and run-review are
+ * populated in demo mode — built from the tail of the demo season with
+ * plausible verdicts. Clearly demo content; erased on Clear demo.
+ */
+export const demoArchive = (): ArchivedRun[] => {
+  const recent = demoLog().slice(-5).reverse() // newest first
+  return recent.map((entry, i) => {
+    const event = eventByCode(entry.event)
+    const strong = entry.score >= 82
+    return {
+      id: `demo-${i}`,
+      at: Date.now() - i * 86_400_000,
+      eventCode: entry.event,
+      eventName: event.name,
+      difficulty: 'provincial' as const,
+      fromPdf: false,
+      overall: entry.score,
+      scenario: {
+        event: event.name,
+        cluster: event.cluster,
+        role: 'You are the assistant manager of a mid-sized retailer facing a same-week staffing and sales problem.',
+        situation:
+          'Two team members gave notice, weekend sales are down 12%, and the district manager wants a recovery plan that holds the labour budget.',
+        judgeRole: 'your district manager',
+        indicators: [
+          'Explain the nature of effective communication',
+          'Demonstrate problem-solving skills',
+          'Describe the nature of budgets',
+          'Explain the nature of positive customer relations',
+          'Make oral presentations'
+        ]
+      },
+      transcript:
+        'Thank you for the time. My plan has three parts: cover the immediate shifts by cross-training two floor staff, protect the weekend rush with our strongest sellers scheduled to peak hours, and post the openings today while fast-tracking a referral. I would keep the labour budget flat by trimming mid-week overlap.',
+      verdict: {
+        scores: [
+          { indicator: 'Explain the nature of effective communication', score: strong ? 88 : 62, justification: 'Opened with a clear, structured plan.', suggestion: 'Name the audience for each message.' },
+          { indicator: 'Demonstrate problem-solving skills', score: strong ? 90 : 66, justification: 'Identified root causes and concrete actions.', suggestion: 'Add a fallback if referrals fall through.' },
+          { indicator: 'Describe the nature of budgets', score: strong ? 84 : 58, justification: 'Committed to holding the labour budget flat.', suggestion: 'Show the dollar math behind the trim.' },
+          { indicator: 'Explain the nature of positive customer relations', score: strong ? 80 : 55, justification: 'Linked staffing to the weekend rush.', suggestion: 'Tie coverage explicitly to wait times.' },
+          { indicator: 'Make oral presentations', score: strong ? 86 : 60, justification: 'Confident, organized delivery.', suggestion: 'Vary pace on the key recommendation.' }
+        ],
+        overall: entry.score,
+        summary: strong
+          ? 'A specific, well-structured plan that held the budget and addressed the staffing crunch directly.'
+          : 'A workable plan that stayed general; the biggest gap was quantitative detail.',
+        strengths: strong
+          ? ['Clear three-part structure', 'Held the labour budget', 'Concrete staffing actions']
+          : ['Identified the core problem', 'Proposed a coverage plan'],
+        improvements: strong
+          ? ['Show the budget math', 'Add a referral fallback']
+          : ['Add specific numbers', 'Explain the customer-service impact'],
+        followUp: 'How would your plan change if the referral hire falls through this week?'
+      },
+      delivery: {
+        words: 300 + i * 20,
+        durationSeconds: entry.minutes * 60,
+        wpm: 120 + i * 4,
+        fillerTotal: entry.fillers,
+        fillers: entry.fillers > 0 ? [{ phrase: 'um', count: entry.fillers }] : []
+      },
+      ...(entry.qna !== undefined ? { qnaScore: entry.qna } : {})
+    }
+  })
+}
+
 export const isDemoActive = (): boolean => {
   try {
     return window.localStorage.getItem(DEMO_FLAG_KEY) === '1'
@@ -75,6 +144,7 @@ export const seedDemo = (): void => {
   saveProfile(DEMO_PROFILE)
   replaceLog(demoLog())
   replaceHistory(demoHistory())
+  replaceArchive(demoArchive())
   try {
     window.localStorage.setItem(DEMO_FLAG_KEY, '1')
   } catch {
@@ -86,6 +156,7 @@ export const seedDemo = (): void => {
 export const clearDemo = (): void => {
   clearProfileAndLog()
   clearHistory()
+  clearArchive()
   try {
     window.localStorage.removeItem(DEMO_FLAG_KEY)
   } catch {

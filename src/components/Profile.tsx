@@ -11,6 +11,7 @@ import {
   type CompetitorProfile,
   type LogEntry
 } from '../lib/profile'
+import type { ArchivedRun } from '../lib/archive'
 import { downloadShareCard } from '../lib/sharecard'
 import { trendPoints } from '../lib/trend'
 import { CompetitorCard } from './CompetitorCard'
@@ -29,8 +30,14 @@ interface ProfileProps {
   profile: CompetitorProfile
   log: LogEntry[]
   history: RunRecord[]
+  /** Full archived runs (newest first) — powers the clickable recent takes. */
+  archive: ArchivedRun[]
   onStartPracticing: () => void
   onEditProfile: () => void
+  /** Open one archived run in the training log. */
+  onOpenRun: (id: string) => void
+  /** Open the full training log. */
+  onOpenLog: () => void
   /** True when the dashboard is showing the seeded sample season. */
   demoActive: boolean
   onClearDemo: () => void
@@ -40,8 +47,11 @@ export const Profile = ({
   profile,
   log,
   history,
+  archive,
   onStartPracticing,
   onEditProfile,
+  onOpenRun,
+  onOpenLog,
   demoActive,
   onClearDemo
 }: ProfileProps): JSX.Element => {
@@ -104,6 +114,9 @@ export const Profile = ({
         <div className="profile-head-actions">
           <button className="btn btn--primary" onClick={onStartPracticing}>
             Start practicing
+          </button>
+          <button className="btn btn--ghost btn--sm" onClick={onOpenLog}>
+            Training log
           </button>
           <button className="btn btn--ghost btn--sm" onClick={shareCard}>
             Share card
@@ -191,23 +204,53 @@ export const Profile = ({
         </ul>
       </div>
 
-      {history.length > 0 && (
+      {archive.length > 0 ? (
         <div className="card profile-panel">
-          <p className="label">Recent takes</p>
-          <ul className="take-list">
-            {history.slice(0, 8).map((run, i) => (
-              <li key={`${run.at}-${i}`}>
-                <span className="take-score" style={{ color: colorFor(run.overall) }}>
-                  {run.overall}
-                </span>
-                <span className="take-event">{run.event}</span>
-                <span className="take-meta">
-                  {formatDay(run.at)} · {run.wpm} wpm · {run.words} words
-                </span>
+          <div className="panel-head">
+            <p className="label">Recent takes</p>
+            {archive.length > 8 && (
+              <button className="btn btn--ghost btn--sm" onClick={onOpenLog}>
+                View all {archive.length}
+              </button>
+            )}
+          </div>
+          <ul className="take-list take-list--clickable">
+            {archive.slice(0, 8).map((run) => (
+              <li key={run.id}>
+                <button className="take-row" onClick={() => onOpenRun(run.id)}>
+                  <span className="take-score" style={{ color: colorFor(run.overall) }}>
+                    {run.overall}
+                  </span>
+                  <span className="take-event">{run.eventName}</span>
+                  <span className="take-meta">
+                    {run.eventCode || 'PDF'} · {formatDay(run.at)}
+                    {run.qnaScore !== undefined ? ' · Q&A' : ''}
+                  </span>
+                  <span className="take-open" aria-hidden="true">→</span>
+                </button>
               </li>
             ))}
           </ul>
         </div>
+      ) : (
+        history.length > 0 && (
+          <div className="card profile-panel">
+            <p className="label">Recent takes</p>
+            <ul className="take-list">
+              {history.slice(0, 8).map((run, i) => (
+                <li key={`${run.at}-${i}`}>
+                  <span className="take-score" style={{ color: colorFor(run.overall) }}>
+                    {run.overall}
+                  </span>
+                  <span className="take-event">{run.event}</span>
+                  <span className="take-meta">
+                    {formatDay(run.at)} · {run.wpm} wpm · {run.words} words
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
       )}
     </section>
   )

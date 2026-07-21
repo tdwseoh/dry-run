@@ -10,6 +10,8 @@ import { ScoreBurst } from './components/ScoreBurst'
 import { Sparkline } from './components/Sparkline'
 import { Tally, type TallyMode } from './components/Tally'
 import { Timecode } from './components/Timecode'
+import { TrainingLog } from './components/TrainingLog'
+import { VerdictBody, Tape } from './components/VerdictBody'
 import { ApiError, generateScenario, judgeTranscript } from './lib/api'
 import { playAlarm } from './lib/alarm'
 import {
@@ -19,13 +21,15 @@ import {
   eventByCode
 } from './lib/events'
 import { trendPoints } from './lib/trend'
-import { clearDemo, isDemoActive, seedDemo } from './lib/demo'
 import {
-  computeDelivery,
-  paceLabel,
-  segmentFillers,
-  type DeliveryStats
-} from './lib/delivery'
+  attachQnaToArchive,
+  loadArchive,
+  newRunId,
+  saveArchivedRun,
+  type ArchivedRun
+} from './lib/archive'
+import { clearDemo, isDemoActive, seedDemo } from './lib/demo'
+import { computeDelivery, paceLabel, type DeliveryStats } from './lib/delivery'
 import {
   loadHistory,
   personalBest,
@@ -51,7 +55,7 @@ import { isSpeechSupported, startSpeech, type SpeechSession } from './lib/speech
 import type { Difficulty, JudgeResult, RunMode, Scenario } from './types'
 
 // The whole app is one state machine keyed on `phase`. Everything else is derived.
-type Phase = 'home' | 'setup' | 'prep' | 'onair' | 'verdict' | 'profile'
+type Phase = 'home' | 'setup' | 'prep' | 'onair' | 'verdict' | 'profile' | 'log'
 
 /** The gamification beats of the run that just finished, shown on the verdict. */
 interface RunMoments {
@@ -237,7 +241,6 @@ export const DryRun = (): JSX.Element => {
   const [verdict, setVerdict] = useState<JudgeResult | null>(null)
   const [judging, setJudging] = useState(false)
   const [judgeAttempt, setJudgeAttempt] = useState(0)
-  const [copied, setCopied] = useState(false)
 
   // Delivery + history.
   const [delivery, setDelivery] = useState<DeliveryStats | null>(null)
@@ -249,6 +252,10 @@ export const DryRun = (): JSX.Element => {
   const [log, setLog] = useState<LogEntry[]>(() => loadLog())
   const [runMoments, setRunMoments] = useState<RunMoments | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
+
+  // Full-run archive (reviewable training log) and the run being opened from it.
+  const [archive, setArchive] = useState<ArchivedRun[]>(() => loadArchive())
+  const [logSelection, setLogSelection] = useState<string | null>(null)
 
   const speechRef = useRef<SpeechSession | null>(null)
   const onairStartedAtRef = useRef<number | null>(null)
@@ -360,6 +367,7 @@ export const DryRun = (): JSX.Element => {
     const before = loadLog()
     const after = attachQnaToLatest(score)
     setLog(after)
+    setArchive(attachQnaToArchive(score))
     const unlocked = newlyEarned(before, after)
     if (unlocked.length > 0) {
       setRunMoments((prev) => ({
@@ -375,6 +383,14 @@ export const DryRun = (): JSX.Element => {
     setShowOnboarding(false)
   }
 
+  // Open the training log — optionally deep-linked to one archived run.
+  const openLog = (runId: string | null = null): void => {
+    setArchive(loadArchive())
+    setLogSelection(runId)
+    setRunMoments(null)
+    setPhase('log')
+  }
+
   // Demo mode: seed the sample season (judge-explorable dashboard in one
   // click), or erase it entirely. Both re-sync all state from storage.
   const exploreDemo = (): void => {
@@ -382,6 +398,7 @@ export const DryRun = (): JSX.Element => {
     setProfile(loadProfile())
     setLog(loadLog())
     setHistory(loadHistory())
+    setArchive(loadArchive())
     setPhase('profile')
   }
 
@@ -390,18 +407,8 @@ export const DryRun = (): JSX.Element => {
     setProfile(null)
     setLog([])
     setHistory([])
+    setArchive([])
     setPhase('home')
-  }
-
-  const copyTranscript = (): void => {
-    try {
-      void navigator.clipboard.writeText(submittedTranscript).then(() => {
-        setCopied(true)
-        window.setTimeout(() => setCopied(false), 1500)
-      })
-    } catch {
-      // Clipboard unavailable (insecure context) — the text is on screen anyway.
-    }
   }
 
   // ---- Timers -------------------------------------------------------------
@@ -507,6 +514,22 @@ export const DryRun = (): JSX.Element => {
           streak: currentStreak(after, new Date()),
           unlocked: newlyEarned(before, after)
         })
+        // Archive the FULL run so it can be reopened and studied later.
+        setArchive(
+          saveArchivedRun({
+            id: newRunId(),
+            at: Date.now(),
+            eventCode: fromPdf ? '' : eventCode,
+            eventName: scenario.event,
+            difficulty,
+            fromPdf,
+            overall: result.overall,
+            scenario,
+            transcript: submittedTranscript,
+            verdict: result,
+            delivery: stats
+          })
+        )
         setVerdict(result)
         setJudging(false)
       })
@@ -562,7 +585,7 @@ export const DryRun = (): JSX.Element => {
   return (
     <div className="app">
       <header
-        className={`rack${phase === 'home' || phase === 'profile' ? ' rack--nav' : ''}`}
+        className={`rack${phase === 'home' || phase === 'profile' || phase === 'log' ? ' rack--nav' : ''}`}
       >
         <div className="rack-left">
           <span className="rack-glyph" aria-hidden="true">
@@ -570,7 +593,7 @@ export const DryRun = (): JSX.Element => {
           </span>
           <span className="wordmark">Dry Run</span>
         </div>
-        {phase === 'home' || phase === 'profile' ? (
+        {phase === 'home' || phase === 'profile' || phase === 'log' ? (
           <>
             <div className="rack-center" />
             <div className="rack-right">
@@ -639,10 +662,22 @@ export const DryRun = (): JSX.Element => {
               profile={profile}
               log={log}
               history={history}
+              archive={archive}
               onStartPracticing={() => setPhase('setup')}
               onEditProfile={() => setShowOnboarding(true)}
+              onOpenRun={(id) => openLog(id)}
+              onOpenLog={() => openLog()}
               demoActive={isDemoActive()}
               onClearDemo={leaveDemo}
+            />
+          )}
+
+          {phase === 'log' && (
+            <TrainingLog
+              runs={archive}
+              initialRunId={logSelection}
+              onBack={() => setPhase(profile ? 'profile' : 'home')}
+              onStartPracticing={() => setPhase('setup')}
             />
           )}
 
@@ -899,105 +934,7 @@ export const DryRun = (): JSX.Element => {
                       ))}
                     </div>
                   )}
-                <p className="summary">{verdict.summary}</p>
-
-                {((verdict.strengths?.length ?? 0) > 0 ||
-                  (verdict.improvements?.length ?? 0) > 0) && (
-                  <div className="verdict-lists">
-                    {(verdict.strengths?.length ?? 0) > 0 && (
-                      <div className="vlist vlist--good">
-                        <p className="label">What worked</p>
-                        <ul>
-                          {verdict.strengths?.map((item, i) => (
-                            <li key={i}>
-                              <span className="vlist-mark">&#10003;</span>
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {(verdict.improvements?.length ?? 0) > 0 && (
-                      <div className="vlist vlist--fix">
-                        <p className="label">Raise the score</p>
-                        <ul>
-                          {verdict.improvements?.map((item, i) => (
-                            <li key={i}>
-                              <span className="vlist-mark">&#8594;</span>
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {delivery && (
-                  <div className="delivery" aria-label="Delivery statistics">
-                    <div className="delivery-stat">
-                      <span className="delivery-num">
-                        {formatDuration(delivery.durationSeconds)}
-                      </span>
-                      <span className="delivery-cap">on air</span>
-                    </div>
-                    <div className="delivery-stat">
-                      <span className="delivery-num">{delivery.words}</span>
-                      <span className="delivery-cap">words</span>
-                    </div>
-                    <div className="delivery-stat">
-                      <span className="delivery-num">{delivery.wpm}</span>
-                      <span className="delivery-cap">
-                        wpm · {paceLabel(delivery.wpm)}
-                      </span>
-                    </div>
-                    <div className="delivery-stat">
-                      <span className="delivery-num">{delivery.fillerTotal}</span>
-                      <span className="delivery-cap">
-                        {delivery.fillerTotal === 0
-                          ? 'fillers — clean take'
-                          : `fillers · ${delivery.fillers
-                              .slice(0, 3)
-                              .map((f) => `${f.phrase} ×${f.count}`)
-                              .join(', ')}`}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <ol className="score-list">
-                  {verdict.scores.map((entry, i) => (
-                    <li
-                      className="score-row"
-                      key={`${i}-${entry.indicator}`}
-                      style={{ animationDelay: `${i * 90}ms` }}
-                    >
-                      <div className="score-row-head">
-                        <span className="score-indicator">{entry.indicator}</span>
-                        <span
-                          className="score-num"
-                          style={{ color: colorFor(entry.score) }}
-                        >
-                          {entry.score}
-                        </span>
-                      </div>
-                      <div className="score-bar">
-                        <div
-                          className="score-bar-fill"
-                          style={{
-                            width: `${entry.score}%`,
-                            background: colorFor(entry.score)
-                          }}
-                        />
-                      </div>
-                      <p className="score-just">{entry.justification}</p>
-                      <p className="score-suggest">
-                        <span className="suggest-tag">Fix</span>
-                        {entry.suggestion}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
+                <VerdictBody verdict={verdict} delivery={delivery} animateScores />
 
                 {verdict.followUp && scenario && (
                   <QnaRound
@@ -1009,25 +946,7 @@ export const DryRun = (): JSX.Element => {
                   />
                 )}
 
-                {submittedTranscript && (
-                  <details className="tape">
-                    <summary>Read the tape — full transcript, fillers highlighted</summary>
-                    <p className="tape-text">
-                      {segmentFillers(submittedTranscript).map((seg, i) =>
-                        seg.filler ? (
-                          <mark className="filler-mark" key={i}>
-                            {seg.text}
-                          </mark>
-                        ) : (
-                          <span key={i}>{seg.text}</span>
-                        )
-                      )}
-                    </p>
-                    <button className="btn btn--ghost btn--sm" onClick={copyTranscript}>
-                      {copied ? 'Copied' : 'Copy transcript'}
-                    </button>
-                  </details>
-                )}
+                <Tape transcript={submittedTranscript} />
 
                 {history.length >= 2 && (
                   <div className="trend" aria-label="Score trend">
@@ -1058,6 +977,9 @@ export const DryRun = (): JSX.Element => {
                       Create your competitor profile
                     </button>
                   )}
+                  <button className="btn btn--ghost" onClick={() => openLog()}>
+                    Training log
+                  </button>
                   <button
                     className="btn btn--ghost"
                     onClick={() => newTake('home')}
