@@ -3824,3 +3824,109 @@ body {
   color: var(--amber);
   margin: 14px 0 0;
 }
+
+/* ==========================================================================
+   Settings / data overlay
+   ========================================================================== */
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  font-size: 17px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--slate);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.icon-btn:hover {
+  color: var(--bone);
+  border-color: rgba(241, 238, 231, 0.3);
+  transform: rotate(30deg);
+}
+
+.settings-card {
+  width: min(600px, calc(100vw - 44px));
+}
+
+.settings-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.settings-head .onboard-title {
+  margin-bottom: 0;
+}
+
+.settings-lead {
+  color: var(--slate);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 6px 0 20px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.settings-row-title {
+  font-weight: 700;
+  font-size: 15px;
+  margin: 0 0 3px;
+}
+
+.settings-row-sub {
+  color: var(--slate);
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 40ch;
+}
+
+.settings-row--danger .settings-row-title {
+  color: var(--red);
+}
+
+.settings-danger-btn {
+  color: var(--red);
+  border-color: rgba(255, 59, 48, 0.4);
+  white-space: nowrap;
+}
+
+.settings-confirm {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.settings-note {
+  margin: 16px 0 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.settings-note--ok {
+  color: var(--mint);
+  background: rgba(55, 217, 169, 0.08);
+  border: 1px solid rgba(55, 217, 169, 0.3);
+}
+
+.settings-note--err {
+  color: var(--red);
+  background: rgba(255, 59, 48, 0.08);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+}

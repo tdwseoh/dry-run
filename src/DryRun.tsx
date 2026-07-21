@@ -7,6 +7,7 @@ import { Profile } from './components/Profile'
 import { QnaRound } from './components/QnaRound'
 import { RunSetup } from './components/RunSetup'
 import { ScoreBurst } from './components/ScoreBurst'
+import { Settings } from './components/Settings'
 import { Sparkline } from './components/Sparkline'
 import { Tally, type TallyMode } from './components/Tally'
 import { Timecode } from './components/Timecode'
@@ -256,6 +257,7 @@ export const DryRun = (): JSX.Element => {
   // Full-run archive (reviewable training log) and the run being opened from it.
   const [archive, setArchive] = useState<ArchivedRun[]>(() => loadArchive())
   const [logSelection, setLogSelection] = useState<string | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
 
   const speechRef = useRef<SpeechSession | null>(null)
   const onairStartedAtRef = useRef<number | null>(null)
@@ -381,6 +383,16 @@ export const DryRun = (): JSX.Element => {
     saveProfile(next)
     setProfile(next)
     setShowOnboarding(false)
+  }
+
+  // Re-sync every store into state after an import or wipe (Settings).
+  const reloadFromStorage = (): void => {
+    const nextProfile = loadProfile()
+    setProfile(nextProfile)
+    setLog(loadLog())
+    setHistory(loadHistory())
+    setArchive(loadArchive())
+    if (!nextProfile && phase === 'profile') setPhase('home')
   }
 
   // Open the training log — optionally deep-linked to one archived run.
@@ -621,6 +633,14 @@ export const DryRun = (): JSX.Element => {
                 </button>
               )}
               <button
+                className="icon-btn"
+                onClick={() => setShowSettings(true)}
+                aria-label="Settings and data"
+                title="Settings"
+              >
+                &#9881;
+              </button>
+              <button
                 className="nav-cta"
                 onClick={() => setPhase('setup')}
                 disabled={generating}
@@ -672,6 +692,7 @@ export const DryRun = (): JSX.Element => {
               onEditProfile={() => setShowOnboarding(true)}
               onOpenRun={(id) => openLog(id)}
               onOpenLog={() => openLog()}
+              onOpenSettings={() => setShowSettings(true)}
               demoActive={isDemoActive()}
               onClearDemo={leaveDemo}
             />
@@ -1004,6 +1025,13 @@ export const DryRun = (): JSX.Element => {
           initial={profile}
           onComplete={completeOnboarding}
           onDismiss={() => setShowOnboarding(false)}
+        />
+      )}
+
+      {showSettings && (
+        <Settings
+          onDataChanged={reloadFromStorage}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>

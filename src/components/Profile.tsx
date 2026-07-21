@@ -43,6 +43,8 @@ interface ProfileProps {
   onOpenRun: (id: string) => void
   /** Open the full training log. */
   onOpenLog: () => void
+  /** Open the settings / data overlay. */
+  onOpenSettings: () => void
   /** True when the dashboard is showing the seeded sample season. */
   demoActive: boolean
   onClearDemo: () => void
@@ -58,6 +60,7 @@ export const Profile = ({
   onEditProfile,
   onOpenRun,
   onOpenLog,
+  onOpenSettings,
   demoActive,
   onClearDemo
 }: ProfileProps): JSX.Element => {
@@ -132,6 +135,9 @@ export const Profile = ({
           </button>
           <button className="btn btn--ghost btn--sm" onClick={onEditProfile}>
             Edit profile
+          </button>
+          <button className="btn btn--ghost btn--sm" onClick={onOpenSettings}>
+            Settings
           </button>
         </div>
       </div>
