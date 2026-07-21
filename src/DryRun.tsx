@@ -664,6 +664,11 @@ export const DryRun = (): JSX.Element => {
               history={history}
               archive={archive}
               onStartPracticing={() => setPhase('setup')}
+              onStartDrill={(code, tier) => {
+                setEventCode(code)
+                setDifficulty(tier)
+                setPhase('setup')
+              }}
               onEditProfile={() => setShowOnboarding(true)}
               onOpenRun={(id) => openLog(id)}
               onOpenLog={() => openLog()}

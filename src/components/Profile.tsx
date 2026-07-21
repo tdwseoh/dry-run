@@ -12,8 +12,11 @@ import {
   type LogEntry
 } from '../lib/profile'
 import type { ArchivedRun } from '../lib/archive'
+import { eventByCode as lookupEvent } from '../lib/events'
+import { dailyFocus, goalProgress } from '../lib/goals'
 import { downloadShareCard } from '../lib/sharecard'
 import { trendPoints } from '../lib/trend'
+import type { Difficulty } from '../types'
 import { CompetitorCard } from './CompetitorCard'
 
 // The competitor dashboard (phase === 'profile'): identity card, the honest
@@ -33,6 +36,8 @@ interface ProfileProps {
   /** Full archived runs (newest first) — powers the clickable recent takes. */
   archive: ArchivedRun[]
   onStartPracticing: () => void
+  /** Launch a run with a specific event + tier pre-selected (daily focus). */
+  onStartDrill: (eventCode: string, difficulty: Difficulty) => void
   onEditProfile: () => void
   /** Open one archived run in the training log. */
   onOpenRun: (id: string) => void
@@ -49,6 +54,7 @@ export const Profile = ({
   history,
   archive,
   onStartPracticing,
+  onStartDrill,
   onEditProfile,
   onOpenRun,
   onOpenLog,
@@ -60,6 +66,9 @@ export const Profile = ({
   const all = achievements(log)
   const byEvent = perEventStats(log)
   const totalMinutes = log.reduce((sum, e) => sum + e.minutes, 0)
+  const goal = goalProgress(profile.goal, log, now)
+  const focus = dailyFocus(profile.events, log, now)
+  const focusEvent = lookupEvent(focus.eventCode)
 
   const shareCard = (): void => {
     const scores = log.map((e) => e.score)
@@ -124,6 +133,47 @@ export const Profile = ({
           <button className="btn btn--ghost btn--sm" onClick={onEditProfile}>
             Edit profile
           </button>
+        </div>
+      </div>
+
+      <div className="focus-goal">
+        <div className="card focus-card">
+          <div className="focus-head">
+            <p className="label">Today&rsquo;s focus</p>
+            {focus.doneToday && <span className="focus-done">✓ done today</span>}
+          </div>
+          <p className="focus-drill">
+            Drill <strong>{focus.eventCode}</strong> · {focusEvent.name}
+          </p>
+          <p className="focus-reason">{focus.reason}</p>
+          <p className="focus-streak">{focus.streakLine}</p>
+          <button
+            className="btn btn--primary btn--sm"
+            onClick={() => onStartDrill(focus.eventCode, focus.difficulty)}
+          >
+            {focus.doneToday ? 'Run it again' : "Start today's drill"}
+          </button>
+        </div>
+
+        <div className="card goal-card">
+          <div className="goal-head">
+            <p className="label">{goal.label}</p>
+            <span className="goal-pct">{goal.pct}%</span>
+          </div>
+          <div className="goal-bar" aria-hidden="true">
+            <div className="goal-bar-fill" style={{ width: `${goal.pct}%` }} />
+          </div>
+          <ul className="goal-steps">
+            {goal.steps.map((s) => (
+              <li key={s.id} className={s.done ? 'is-done' : ''}>
+                <span className="goal-check" aria-hidden="true">
+                  {s.done ? '✓' : '○'}
+                </span>
+                {s.label}
+              </li>
+            ))}
+          </ul>
+          {goal.next && <p className="goal-next">Next: {goal.next}</p>}
         </div>
       </div>
 
